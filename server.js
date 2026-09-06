@@ -61,6 +61,20 @@ function tickPet(p,id,dt){
     }
   }
 }
+function tickSummon(p,id,dt){
+  const s=p.summon;
+  s.expireT-=dt; if(s.expireT<=0){ p.summon=null; sendTo(id,{t:'toast',text:'Cấm Vệ Quân đã hết hạn triệu hồi.'}); return; }
+  if(s.zone!==p.zone){ s.zone=p.zone; s.x=p.x; s.y=p.y; }
+  const tx=p.x+p.fx*30, ty=p.y+p.fy*30;
+  s.x+=(tx-s.x)*Math.min(1,dt*4); s.y+=(ty-s.y)*Math.min(1,dt*4);
+  s.atkT=(s.atkT||0)-dt;
+  if(s.atkT<=0){
+    s.atkT=1.5;
+    let best=null,bd=160;
+    for(const eid in enemies){const e=enemies[eid];if(e.dead||e.zone!==s.zone)continue;const d=Math.hypot(e.x-s.x,e.y-s.y);if(d<bd){bd=d;best=e;}}
+    if(best){ hurtEnemy(best,s.atk,id); fxEv('swing',best.x,best.y,45,1,0,0); }
+  }
+}
 function doFeedPet(p,id){
   if(!p.pet)return; const cost=30;
   if(p.gold<cost){ sendTo(id,{t:'toast',text:'Cần 30🪙 để cho Đệ Tử ăn'}); return; }
@@ -568,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.49 · pull fix + admin companions</div>
+  <div id="ver">v0.50 · Cấm Vệ Quân (summon)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -650,7 +664,7 @@ document.getElementById('chrClose').addEventListener('pointerdown',function(ev){
 var myInv=[], myEquip={}, invOpen=false, selId=null;
 var myParty=null, chatLog=[], socOpen=false, socTab='chat', pendingInviteFrom=null;
 var NPCLIST=[], nearNpcId=null, nearNpcKind=null, npcOpen=false, curNpcId=null, curNpcData=null;
-var PETTYPES=[], myPets={}, myPetOwn=null, petOpen=false, myFusedT=0, myFusionCd=0;
+var PETTYPES=[], myPets={}, myPetOwn=null, petOpen=false, myFusedT=0, myFusionCd=0, mySummons={};
 document.getElementById('petbtn').addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
   petOpen=!petOpen; document.getElementById('petPanel').style.display=petOpen?'flex':'none'; if(petOpen)renderPet();});
 document.getElementById('petClose').addEventListener('pointerdown',function(ev){ev.preventDefault();
@@ -1135,7 +1149,7 @@ ws.onmessage=function(e){
     setTimeout(function(){tt.style.opacity=0;},2600); }
   else if(m.t==='dungeon'){ document.getElementById('dglbl').textContent='🎫 Vé Mật Thất: '+m.entries+'/'+m.max; }
   else if(m.t==='state'){
-    players=m.players; enemies=m.enemies; bolts=m.bolts||[]; loot=m.loot||[]; myPets=m.pets||{};
+    players=m.players; enemies=m.enemies; bolts=m.bolts||[]; loot=m.loot||[]; myPets=m.pets||{}; mySummons=m.summons||{};
     document.getElementById('cnt').textContent=Object.keys(m.players).length;
     var me=players[myId];
     if(me){ myZone=me.zone||'town';
@@ -1359,6 +1373,12 @@ function frame(now){
     ctx.font='18px serif';ctx.textAlign='center';ctx.fillText(pd2.icon,pd2.x,pd2.y+pbob+5);
     ctx.fillStyle='#cdbf9a';ctx.font='9px Trebuchet MS';ctx.fillText('Lv'+pd2.lv,pd2.x,pd2.y-10+pbob);
     ctx.restore();}
+  for(var sid3 in mySummons){ var sd3=mySummons[sid3]; if(sd3.zone!==myZone)continue;
+    var sbob=Math.sin(performance.now()/300)*2;
+    ctx.save();
+    ctx.fillStyle='#ffd76b';ctx.globalAlpha=.45;ctx.beginPath();ctx.arc(sd3.x,sd3.y+9,11,0,7);ctx.fill();ctx.globalAlpha=1;
+    ctx.font='20px serif';ctx.textAlign='center';ctx.fillText('🛡️',sd3.x,sd3.y+sbob+6);
+    ctx.restore();}
 
   for(var i=fx.length-1;i>=0;i--){var f=fx[i];f.life-=dt;if(f.life<=0){fx.splice(i,1);continue;}
     var t=1-f.life/f.max; ctx.globalAlpha=f.life/f.max;
@@ -1558,7 +1578,7 @@ wss.on('connection',(ws)=>{
     passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
     dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,hspet:null,hspetApplied:null,
-    gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,
+    gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,summon:null,
     basicType:'melee',basicRange:90,basicDmg:18,basicCd:0.45,basicSpd:0,basicR:6,basicKind:'melee',
     cd:{b:0,q:0,w:0,e:0,r:0}};
   ws.pid=id; sockets[id]=ws;
@@ -1705,7 +1725,7 @@ const SKILLS = {
     {id:'c1',name:'Lướt',       icon:'💨',type:'dash', mp:10,cd:2.2, unlockLv:2,  dist:150},
     {id:'c2',name:'Xích Trói',  icon:'⛓️',type:'proj', mp:16,cd:1.0, unlockLv:3,  count:1,dmg:30,speed:400,r:7,kind:'chain', authGain:8,slowMul:0.08,slowDur:1.4},
     {id:'c3',name:'Chữa Trị',   icon:'💚',type:'heal', mp:30,cd:7,   unlockLv:5,  radius:165,heal:60, authGain:12, reqStat:'INT',reqVal:10},
-    {id:'c4',name:'Uy Lệnh',    icon:'👑',type:'buff', mp:55,cd:14,  unlockLv:7,  dur:6,atk:18,spdmul:1.2,radius:170,dmg:32, authGain:18},
+    {id:'c4',name:'Uy Lệnh',    icon:'👑',type:'summon', mp:55,cd:20,  unlockLv:7,  dur:20,atk:18,spdmul:1.2,radius:170,dmg:32, authGain:18},
     {id:'c5',name:'Giáp Hộ Vệ', icon:'🛡️',type:'shield',mp:26,cd:10,unlockLv:10, amount:55,dur:5,radius:160, authGain:10},
     {id:'c6',name:'Áp Chế',     icon:'❄️',type:'slow', mp:26,cd:8,   unlockLv:13, radius:140,dmg:18,slowMul:0.5,slowDur:2.8, authGain:10},
     {id:'c7',name:'Xích Hút Sinh',icon:'⛓️',type:'lifesteal',mp:22,cd:4,unlockLv:16,range:220,dmg:26,lsPct:0.5,kind:'chain', authGain:8, reqStat:'STR',reqVal:18},
@@ -1818,6 +1838,12 @@ function execSkill(p,id,sk,rank){
   }
   else if(sk.type==='buff'){ p.buffT=sk.dur;p.buffAtk=(sk.atk||0)*mul;p.buffSpdMul=sk.spdmul||1;
     if(sk.dmg)aoe(p,sk.radius||150,(sk.dmg+POW(p))*mul,id);
+    if(p.cls==='cmd' && sk.authGain) p.authority=Math.min(100,(p.authority||0)+sk.authGain);
+    fxEv('ring',p.x,p.y,p.hue,0,0,sk.radius||150); }
+  else if(sk.type==='summon'){
+    p.summon={x:p.x,y:p.y,zone:p.zone,atk:Math.round((sk.atk+POW(p))*mul*0.6),expireT:sk.dur,atkT:0};
+    for(const pid in players){const o=players[pid];if(!o.chosen||o.dead)continue;
+      if(Math.hypot(o.x-p.x,o.y-p.y)<sk.radius){ o.buffT=Math.max(o.buffT||0,sk.dur*0.4); o.buffAtk=(o.buffAtk||0)+Math.round(POW(p)*0.2); }}
     if(p.cls==='cmd' && sk.authGain) p.authority=Math.min(100,(p.authority||0)+sk.authGain);
     fxEv('ring',p.x,p.y,p.hue,0,0,sk.radius||150); }
   else if(sk.type==='shield'){
@@ -2297,6 +2323,7 @@ setInterval(()=>{
       if(!wasHungry && p.hspet.hunger<=0){ recompute(p); sendTo(id,{t:'toast',text:'Thú Cưng đói rồi, hiệu quả giảm — cho ăn đi!'}); } }
     else if(p.fusionCd>0){ p.fusionCd=Math.max(0,p.fusionCd-dt); }
     if(p.pet){ if(p.fusedT<=0) tickPet(p,id,dt); else { p.pet.x=p.x; p.pet.y=p.y; p.pet.zone=p.zone; } }
+    if(p.summon){ tickSummon(p,id,dt); }
   }
   for(const eid in enemies){const e=enemies[eid];
     if(e.dead){e.respawnT-=dt;if(e.respawnT<=0){const wasBoss=e.boss,z=e.zone;delete enemies[eid];
@@ -2332,6 +2359,8 @@ setInterval(()=>{
   const pd={}; for(const id in players){const p=players[id]; if(!p.chosen||!p.pet)continue;
     const pt=PET_TYPES.find(t=>t.id===p.pet.type);
     pd[id]={type:p.pet.type,icon:pt?pt.icon:'🐾',hue:pt?pt.hue:0,x:r1(p.pet.x),y:r1(p.pet.y),zone:p.pet.zone,lv:p.pet.lv};}
+  const sd={}; for(const id in players){const p=players[id]; if(!p.chosen||!p.summon)continue;
+    sd[id]={x:r1(p.summon.x),y:r1(p.summon.y),zone:p.summon.zone};}
   // Mỗi người chơi nhận: vị trí/máu công khai của MỌI người (nhẹ) + số liệu riêng (vàng/xp/stat) CHỈ của chính mình
   for(const id in players){ const p=players[id]; if(!p.chosen)continue;
     try{
@@ -2342,11 +2371,11 @@ setInterval(()=>{
         hspet:p.hspet?{stat:p.hspet.stat,hunger:Math.round(p.hspet.hunger)}:null,
         pkScore:Math.round(p.pkScore||0),jailed:Math.round(p.jailed||0)});
       const psOut=Object.assign({},psPublic,{[id]:mine});
-      sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd});
+      sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd,summons:sd});
     }catch(err){ console.error('⚠️ Lỗi gửi state cho #'+id+' (đã chặn, không ảnh hưởng người khác):', err && err.message); }
   }
  }catch(tickErr){ console.error('⚠️ Lỗi trong vòng lặp chính (đã chặn, tick sau sẽ chạy lại bình thường):', tickErr && tickErr.message); }
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.49 (pull fix + admin companions) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.50 (Cấm Vệ Quân summon) chạy ở cổng '+PORT));
