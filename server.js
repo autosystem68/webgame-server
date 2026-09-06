@@ -87,6 +87,24 @@ function doPermFusion(p,id){
   sendTo(id,{t:'toast',text:'💫 '+petName+' đã hợp thể vĩnh viễn! +'+bonus+' mọi chỉ số mãi mãi.'});
   sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout}); sendInv(p,id);
 }
+function doBuyHsPetEgg(p,id){
+  if(p.hspet){ sendTo(id,{t:'toast',text:'Bạn đã có Thú Cưng rồi.'}); return; }
+  if(p.lv<HSPET_MIN_LV){ sendTo(id,{t:'toast',text:'Cần đạt Lv '+HSPET_MIN_LV+' để mua trứng.'}); return; }
+  if(p.gold<HSPET_EGG_COST){ sendTo(id,{t:'toast',text:'Cần '+HSPET_EGG_COST+'🪙 để mua trứng.'}); return; }
+  p.gold-=HSPET_EGG_COST;
+  p.hspet={stat:{STR:0,VIT:0,AGI:0,INT:0},hunger:100};
+  sendTo(id,{t:'toast',text:'🥚 Trứng nở rồi! Bạn có Thú Cưng mới.'}); sendInv(p,id); recompute(p);
+}
+function doFeedHsPet(p,id,itemId){
+  if(!p.hspet)return;
+  const idx=(p.inv||[]).findIndex(x=>x.id===itemId); if(idx<0)return;
+  const it=p.inv[idx]; const stat=HSPET_FOOD_MAP[it.slot]; if(!stat)return;
+  const gain=2+(it.tier||1)*2+(it.plus||0);
+  p.inv.splice(idx,1); p.hspet.stat[stat]=(p.hspet.stat[stat]||0)+gain; p.hspet.hunger=100;
+  recompute(p);
+  sendTo(id,{t:'toast',text:'🍎 Thú Cưng ăn xong, +'+gain+' '+stat+' (đồng hành)!'});
+  sendInv(p,id);
+}
 // ---- NPC + NHIỆM VỤ NHẬN/GIAO (khác nhiệm vụ hệ thống: không reset ngày, mở khóa tuần tự) ----
 const NPCS = [
   {id:'elder', name:'Trưởng Lão Aldric', icon:'🧙', zone:'town', x:450, y:180, kind:'quest', greet:'Vùng đất này đang gặp nguy. Ngươi có sẵn lòng giúp ta không?'},
@@ -97,6 +115,10 @@ const POTIONS = [
   {id:'hp', name:'🧪 Bình Máu', desc:'Hồi ngay 60 HP', cost:15},
   {id:'mp', name:'💧 Bình Mana', desc:'Hồi ngay 40 Mana', cost:12},
 ];
+// ---- THÚ CƯNG (kiểu Hiệp Sĩ) — mua trứng ở NPC, cho ăn theo loại đồ để lên đúng nhóm chỉ số, KHÔNG tự chiến đấu (khác hẳn Đệ Tử) ----
+const HSPET_EGG_COST=200, HSPET_MIN_LV=5;
+const HSPET_FOOD_MAP={ wpn:'STR', hlm:'VIT', arm:'VIT', glv:'VIT', boot:'VIT', rng:'AGI', neck:'AGI', wing:'INT' };
+function hspetStatBonus(hspet,stat){ return Math.floor((hspet.stat[stat]||0)/8); } // mỗi 8 điểm nuôi = +1 chỉ số thật
 // ---- THÚ CƯỠI — mua tại NPC (khác Đệ Tử/Pet: không săn, không nuôi), lõi là tăng tốc di chuyển ----
 const MOUNTS = [
   {id:'horse', name:'🐴 Ngựa Thường', cost:500,  spdMul:1.15, hp:0,  allStat:0, desc:'+15% tốc độ'},
@@ -105,6 +127,28 @@ const MOUNTS = [
   {id:'dragon',name:'🐉 Long Mã',     cost:8000, spdMul:1.22, hp:60, allStat:5, desc:'+22% tốc độ · +60 Máu · +5 mọi chỉ số'},
 ];
 function sellValue(it){ return Math.max(2, Math.round((it.tier||1)*15 + (it.plus||0)*8)); }
+// ---- ĐÁ THUỘC TÍNH (Ngũ Hành) — lớp nâng cấp thứ 2, ĐỘC LẬP với cường hóa +N, gắn qua Thợ Rèn ----
+const GEM_TYPES = {
+  hoa:  {name:'🔥 Hỏa', desc:'+8% sát thương skill'},
+  thuy: {name:'💧 Thủy', desc:'+8% Mana tối đa, giảm nhẹ hồi chiêu'},
+  moc:  {name:'🌳 Mộc', desc:'+8% Máu tối đa'},
+  tho:  {name:'🪨 Thổ', desc:'-8% sát thương nhận'},
+  kim:  {name:'⚔️ Kim', desc:'+8% sát thương đánh thường'},
+};
+const GEM_SOCKET_COST=150;
+function computeGemBonus(p){
+  const g={hoa:0,thuy:0,moc:0,tho:0,kim:0};
+  for(const s of SLOTS){ const it=p.equip[s]; if(it&&it.gem&&g[it.gem]!==undefined) g[it.gem]++; }
+  return g;
+}
+function doSocketGem(p,id,slot,gemType){
+  if(!GEM_TYPES[gemType])return; const it=p.equip[slot]; if(!it)return;
+  if((p.gemCount&&p.gemCount[gemType]||0)<=0){ sendTo(id,{t:'toast',text:'Không đủ '+GEM_TYPES[gemType].name+' để gắn'}); return; }
+  if(p.gold<GEM_SOCKET_COST){ sendTo(id,{t:'toast',text:'Cần '+GEM_SOCKET_COST+'🪙 để gắn đá'}); return; }
+  p.gold-=GEM_SOCKET_COST; p.gemCount[gemType]--;
+  it.gem=gemType; recompute(p);
+  sendTo(id,{t:'toast',text:'💎 Đã gắn '+GEM_TYPES[gemType].name+' vào '+slot+'!'}); sendInv(p,id);
+}
 function mountSpdMul(p){ if(!p.mounted)return 1; const mt=MOUNTS.find(x=>x.id===p.mounted); return mt?mt.spdMul:1; }
 const NPC_QUESTS = {
   elder: [
@@ -512,6 +556,7 @@ const CLIENT = `<!doctype html>
     <div class="bar"><i id="mpb" style="width:100%"></i><span id="mpt">100/100</span></div>
     <div class="bar" style="width:172px;height:7px"><i id="xpb" style="width:0%;background:linear-gradient(90deg,#e0b062,#c98a2e)"></i></div>
     <div id="resBox" style="margin-top:2px"></div>
+    <div id="pkBox" style="font-size:10px;color:#ff8a6a;display:none;margin-top:2px"></div>
     <div style="margin-top:3px;font-size:12px"><b id="lvt" style="color:#e0b062">Lv 1</b> &nbsp;·&nbsp; <span style="color:#ffd76b">🪙 <span id="gt">0</span></span> &nbsp;·&nbsp; <span style="color:#cfe0ff">⚔<span id="wt">0</span> 🛡<span id="at">0</span></span></div>
   </div>
   <div id="info"><span id="zonelbl">🏘️ Thị Trấn An Bình · An toàn</span><br><span id="bosslbl" style="color:#ffb0b0"></span><br><span id="cnt">0</span> online<br><span id="dglbl" style="color:#c77dff"></span></div>
@@ -523,7 +568,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.44 · fusion + clean admin</div>
+  <div id="ver">v0.48 · PK system</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -545,6 +590,17 @@ var STATNAME={STR:'Sức Mạnh (⚔ dmg)',VIT:'Sinh Lực (❤ máu · 🔰 ph�
 function renderChr(){
   var pb=document.getElementById('pasvBox');
   pb.innerHTML=myPassive?('<b>'+myPassive.name+'</b><br>'+myPassive.desc):'Chưa chọn class';
+  var myPk=(players[myId]&&players[myId].pkScore)||0, myJail=(players[myId]&&players[myId].jailed)||0;
+  if(myPk>0){
+    var pkSec=document.getElementById('pkSecChr');
+    if(!pkSec){ pkSec=document.createElement('div'); pkSec.id='pkSecChr'; pkSec.style.cssText='max-width:320px;width:100%;background:#2a1512;border:1px solid #b8514d;border-radius:8px;padding:10px;margin-bottom:10px;text-align:center';
+      pb.parentNode.insertBefore(pkSec, pb); }
+    pkSec.innerHTML='<div style="color:#ff9a8a;font-size:12px;margin-bottom:6px">☠️ Điểm PK: '+Math.round(myPk)+(myJail>0?' · Đang tự thú ('+Math.round(myJail)+'s)':'')+'</div>';
+    if(myJail<=0){ var tuThuBtn=document.createElement('button'); tuThuBtn.textContent='🔒 Tự Thú (giảm PK nhanh 60s)';
+      tuThuBtn.style.cssText='padding:7px 16px;border-radius:7px;border:1px solid #ff9a8a;background:#3a1a15;color:#ffb0a0;font-size:11px';
+      tuThuBtn.addEventListener('pointerdown',function(ev){ev.preventDefault();ws.send(JSON.stringify({t:'tuthu'}));});
+      pkSec.appendChild(tuThuBtn); }
+  } else { var old=document.getElementById('pkSecChr'); if(old)old.remove(); }
   document.getElementById('ptsline').textContent='Điểm chỉ số: '+myBuild.statPts+' · Điểm skill: '+myBuild.skillPts;
   var sg=document.getElementById('statgrid'); sg.innerHTML='';
   ['STR','VIT','AGI','INT'].forEach(function(st){
@@ -601,11 +657,13 @@ document.getElementById('petClose').addEventListener('pointerdown',function(ev){
   petOpen=false; document.getElementById('petPanel').style.display='none';});
 function renderPet(){
   var box=document.getElementById('petBody'); box.innerHTML='';
+  var h1=document.createElement('div'); h1.style.cssText='color:#e0b062;font-weight:bold;font-size:13px;margin-bottom:6px;align-self:flex-start';
+  h1.textContent='🐺 Đệ Tử (chiến đấu)'; box.appendChild(h1);
   if(!myPetOwn){
     var e=document.createElement('div'); e.className='petempty';
     e.textContent='Chưa có Đệ Tử. Hãy hạ Boss Thế Giới (Rừng Ma / Hang Băng) để có cơ hội săn được một con theo mình!';
-    box.appendChild(e); return;
-  }
+    box.appendChild(e);
+  } else {
   var pt=PETTYPES.find(function(t){return t.id===myPetOwn.type;})||{icon:'🐾',name:'?',desc:''};
   var head=document.createElement('div'); head.className='pethead';
   var pct=Math.min(100,(myPetOwn.xp/myPetOwn.xpNext)*100);
@@ -637,6 +695,37 @@ function renderPet(){
   permBtn.addEventListener('pointerdown',function(ev){ev.preventDefault();
     if(confirm('Đệ Tử sẽ biến mất VĨNH VIỄN để đổi lấy chỉ số cộng thẳng mãi mãi. Chắc chắn chứ?')) ws.send(JSON.stringify({t:'permfusion'}));});
   box.appendChild(permBtn);
+  }
+  var divider=document.createElement('div'); divider.style.cssText='width:100%;max-width:300px;height:1px;background:#6b5636;margin:16px 0';
+  box.appendChild(divider);
+  var h2=document.createElement('div'); h2.style.cssText='color:#e0b062;font-weight:bold;font-size:13px;margin-bottom:6px;align-self:flex-start';
+  h2.textContent='🐾 Thú Cưng (buff thụ động)'; box.appendChild(h2);
+  if(!myHsPet){
+    var e2=document.createElement('div'); e2.className='petempty';
+    e2.textContent='Chưa có Thú Cưng. Mua 🥚 trứng tại Thương Nhân Elin (cần Lv 5, 200🪙).';
+    box.appendChild(e2);
+  } else {
+    var hshead=document.createElement('div'); hshead.className='pethead';
+    var hh=myHsPet.hunger;
+    hshead.innerHTML='<div class="pic">🐾</div><div class="pn">Thú Cưng của bạn</div>'+
+      '<div class="pd">Sức Mạnh +'+Math.floor((myHsPet.stat.STR||0)/8)+' · Sinh Lực +'+Math.floor((myHsPet.stat.VIT||0)/8)+
+      ' · Nhanh Nhẹn +'+Math.floor((myHsPet.stat.AGI||0)/8)+' · Trí Tuệ +'+Math.floor((myHsPet.stat.INT||0)/8)+'</div>'+
+      '<div style="font-size:10px;color:#9a8a6a;margin-top:8px">Độ no '+Math.round(hh)+'/100'+(hh<=0?' · Đói! Giảm hiệu quả':'')+'</div>'+
+      '<div class="petbar"><i style="width:'+hh+'%"></i></div>';
+    box.appendChild(hshead);
+    var feedHint=document.createElement('div'); feedHint.style.cssText='font-size:10px;color:#9a8a6a;margin:8px 0 6px;max-width:300px;text-align:center';
+    feedHint.textContent='Cho ăn bằng đồ trong túi: Vũ khí→Sức Mạnh · Giáp/Mũ/Găng/Giày→Sinh Lực · Nhẫn/Dây chuyền→Nhanh Nhẹn · Cánh→Trí Tuệ';
+    box.appendChild(feedHint);
+    var slotGroups=[['wpn','⚔️ Vũ Khí (STR)'],['arm','🛡️ Giáp (VIT)'],['rng','💍 Nhẫn (AGI)'],['wing','🪽 Cánh (INT)']];
+    slotGroups.forEach(function(sg){
+      var item=myInv.find(function(it){return it.slot===sg[0];});
+      var fbtn=document.createElement('button'); fbtn.textContent='Cho ăn '+sg[1]+(item?'':' (không có đồ)');
+      fbtn.style.cssText='width:100%;max-width:300px;padding:7px;border-radius:7px;border:1px solid #a87b3e;background:#241a10;color:#e0b062;font-size:11px;margin-bottom:5px';
+      fbtn.disabled=!item;
+      fbtn.addEventListener('pointerdown',function(ev){ev.preventDefault(); if(item)ws.send(JSON.stringify({t:'feedhspet',itemId:item.id}));});
+      box.appendChild(fbtn);
+    });
+  }
 }
 document.getElementById('talkBtnInner').addEventListener('pointerdown',function(ev){ev.preventDefault();
   if(!nearNpcId)return;
@@ -668,6 +757,8 @@ function renderNpcPanel(){
   });
 }
 var mySh={potions:[],gold:0,inv:[]}, shTab='buy';
+var HSPET_EGG_COST_CLIENT=200, myHsPet=null;
+var GEMTYPES={}, myGemCount={};
 document.getElementById('shTabBuy').addEventListener('pointerdown',function(ev){ev.preventDefault();
   shTab='buy'; document.getElementById('shTabBuy').classList.add('on'); document.getElementById('shTabSell').classList.remove('on'); document.getElementById('shTabMount').classList.remove('on');
   document.getElementById('shopBuy').style.display='flex'; document.getElementById('shopSell').style.display='none'; document.getElementById('shopMount').style.display='none';});
@@ -698,6 +789,13 @@ function renderMountShop(){
 function renderShop(){
   document.getElementById('shopgold').textContent='🪙 '+mySh.gold;
   var buy=document.getElementById('shopBuy'); buy.innerHTML='';
+  if(!myHsPet){
+    var eggRow=document.createElement('div'); eggRow.className='potrow';
+    eggRow.innerHTML='<div><div class="pn">🥚 Trứng Thú Cưng</div><div class="pd">Nở ngay, nuôi lớn bằng cách cho ăn đồ theo class · cần Lv 5</div></div>';
+    var eggBtn=document.createElement('button'); eggBtn.textContent=HSPET_EGG_COST_CLIENT+'🪙';
+    eggBtn.addEventListener('pointerdown',function(ev){ev.preventDefault();ws.send(JSON.stringify({t:'buyhspet'}));});
+    eggRow.appendChild(eggBtn); buy.appendChild(eggRow);
+  }
   (mySh.potions||[]).forEach(function(pot){
     var row=document.createElement('div'); row.className='potrow';
     row.innerHTML='<div><div class="pn">'+pot.name+'</div><div class="pd">'+pot.desc+'</div></div>';
@@ -961,7 +1059,7 @@ function renderDetail(){
   var top=SLOTICON[it.slot]+' '+SLOTNAME[it.slot]+(pl>0?' <b style="color:#ffd76b">+'+pl+'</b>':'')+' · '+statTxt;
   var cost=eCost(it), need=eStones(it), rate=Math.round(eRate(pl)*100), maxed=pl>=MAXPLUS, poor=(gold<cost||stones<need);
   d.style.display='flex';
-  d.innerHTML='<div class="dtop">'+top+'</div><div class="drow">'+
+  d.innerHTML='<div class="dtop">'+top+(it.gem?' · '+GEMTYPES[it.gem].name:'')+'</div><div class="drow">'+
     '<button id="dAct">'+(f.loc==='bag'?'Mặc':'Cởi')+'</button>'+
     '<button class="ench" id="dEnch" '+((maxed||poor)?'disabled':'')+'>'+
       (maxed?'Tối đa +'+MAXPLUS:'⚒️ +'+(pl+1)+' · '+cost+'🪙 '+need+'🔨 · '+rate+'%')+'</button></div>';
@@ -969,6 +1067,21 @@ function renderDetail(){
     if(f.loc==='bag')ws.send(JSON.stringify({t:'equip',itemId:it.id}));else ws.send(JSON.stringify({t:'unequip',slot:f.slot}));});
   if(!maxed&&!poor)document.getElementById('dEnch').addEventListener('pointerdown',function(ev){ev.preventDefault();
     ws.send(JSON.stringify({t:'enchant',itemId:it.id}));});
+  if(f.loc==='eq'){
+    var gemBox=document.createElement('div'); gemBox.style.cssText='margin-top:10px;width:100%';
+    var gemTitle=document.createElement('div'); gemTitle.style.cssText='font-size:11px;color:#9a8a6a;margin-bottom:5px';
+    gemTitle.textContent='💎 Gắn Đá Thuộc Tính (150🪙, độc lập cường hóa)'; gemBox.appendChild(gemTitle);
+    Object.keys(GEMTYPES).forEach(function(gk){
+      var owned=myGemCount[gk]||0;
+      var row=document.createElement('div'); row.style.cssText='display:flex;justify-content:space-between;align-items:center;background:#1b140d;border:1px solid #6b5636;border-radius:6px;padding:5px 8px;margin-bottom:4px;font-size:10.5px;color:#c8b48a';
+      row.innerHTML='<span>'+GEMTYPES[gk].name+' ('+owned+' viên) · '+GEMTYPES[gk].desc+'</span>';
+      var gbtn=document.createElement('button'); gbtn.textContent=(it.gem===gk)?'Đang gắn':'Gắn';
+      gbtn.disabled=(owned<=0)||(it.gem===gk); gbtn.style.cssText='padding:4px 8px;border-radius:5px;border:1px solid #a87b3e;background:#241a10;color:#e0b062;font-size:10px';
+      gbtn.addEventListener('pointerdown',function(ev){ev.preventDefault();ws.send(JSON.stringify({t:'socketgem',slot:f.slot,gemType:gk}));});
+      row.appendChild(gbtn); gemBox.appendChild(row);
+    });
+    d.appendChild(gemBox);
+  }
 }
 document.getElementById('bag').addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
   invOpen=!invOpen;document.getElementById('inv').style.display=invOpen?'flex':'none';if(invOpen){renderInv();renderDetail();}});
@@ -1008,6 +1121,7 @@ ws.onmessage=function(e){
   else if(m.t==='npcs'){ NPCLIST=m.npcs||[]; }
   else if(m.t==='pettypes'){ PETTYPES=m.types||[]; }
   else if(m.t==='mounttypes'){ MOUNTTYPES=m.types||[]; }
+  else if(m.t==='gemtypes'){ GEMTYPES=m.types||{}; }
   else if(m.t==='mounts'){ myMounts=m.owned||[]; myMounted=m.mounted; if(document.getElementById('shopMount').style.display==='flex')renderMountShop(); }
   else if(m.t==='nearnpc'){ nearNpcId=m.npcId; nearNpcKind=m.kind;
     document.getElementById('talkBtn').style.display=nearNpcId?'flex':'none';
@@ -1025,8 +1139,12 @@ ws.onmessage=function(e){
     document.getElementById('cnt').textContent=Object.keys(m.players).length;
     var me=players[myId];
     if(me){ myZone=me.zone||'town';
-      myPetOwn=me.pet||null; myFusedT=me.fusedT||0; myFusionCd=me.fusionCd||0; if(petOpen)renderPet();
+      myPetOwn=me.pet||null; myFusedT=me.fusedT||0; myFusionCd=me.fusionCd||0; myHsPet=me.hspet||null; if(petOpen)renderPet();
       var pdot=document.getElementById('petbtn'); if(pdot){ pdot.style.opacity = myPetOwn ? 1 : 0.5; }
+      var pkb=document.getElementById('pkBox');
+      if(me.pkScore>0){ pkb.style.display='block';
+        pkb.textContent='☠️ PK: '+me.pkScore+(me.jailed>0?(' · Đang tự thú ('+me.jailed+'s)'):'');
+      } else { pkb.style.display='none'; }
       if(myZone!==lastZoneSeen){ myPX=null; lastZoneSeen=myZone; }
       var zd=ZONEDATA[myZone]; var zel=document.getElementById('zonelbl'); if(zel&&zd)zel.textContent=zd.name+(zd.safe?' · An toàn':'');
       var bl=document.getElementById('bosslbl');
@@ -1065,7 +1183,7 @@ ws.onmessage=function(e){
       SKdur[kk]=d.cd; SKmp[kk]=d.mp; }
     if(chrOpen)renderChr();
   }
-  else if(m.t==='inv'){ myInv=m.inv||[]; myEquip=m.equip||{}; if(invOpen){renderInv();renderDetail();} }
+  else if(m.t==='inv'){ myInv=m.inv||[]; myEquip=m.equip||{}; myGemCount=m.gemCount||{}; if(invOpen){renderInv();renderDetail();} }
   else if(m.t==='quests'){ myQuests=m; updateQuestDot(); if(qOpen)renderQuests(); }
   else if(m.t==='chatmsg'){
     if(m.channel==='guild'){ chatLogGuild.push({id:m.id,text:m.text}); if(chatLogGuild.length>50)chatLogGuild.shift();
@@ -1327,7 +1445,7 @@ function frame(now){
     if(p.mt){ctx.save();ctx.globalAlpha=0.55;ctx.fillStyle='#5a3a1a';ctx.beginPath();ctx.ellipse(rx,ry+16,20,9,0,0,7);ctx.fill();ctx.restore();}
     ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
     ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
-    ctx.fillStyle='#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id,rx,ry-32);
+    ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
     ctx.globalAlpha=1;
   }
 
@@ -1439,7 +1557,8 @@ wss.on('connection',(ws)=>{
     shieldHP:0,shieldT:0,slowT:0,slowMul:1,
     passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
-    dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,
+    dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,hspet:null,hspetApplied:null,
+    gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,
     basicType:'melee',basicRange:90,basicDmg:18,basicCd:0.45,basicSpd:0,basicR:6,basicKind:'melee',
     cd:{b:0,q:0,w:0,e:0,r:0}};
   ws.pid=id; sockets[id]=ws;
@@ -1448,6 +1567,7 @@ wss.on('connection',(ws)=>{
   ws.send(JSON.stringify({t:'npcs',npcs:NPCS}));
   ws.send(JSON.stringify({t:'pettypes',types:PET_TYPES}));
   ws.send(JSON.stringify({t:'mounttypes',types:MOUNTS}));
+  ws.send(JSON.stringify({t:'gemtypes',types:GEM_TYPES}));
 
   ws.on('message',(buf)=>{
     let m; try{m=JSON.parse(buf.toString());}catch(e){return;}
@@ -1518,6 +1638,13 @@ wss.on('connection',(ws)=>{
     else if(m.t==='feedpet'){ doFeedPet(p,id); }
     else if(m.t==='fusion'){ doFusion(p,id); }
     else if(m.t==='permfusion'){ doPermFusion(p,id); }
+    else if(m.t==='buyhspet'){ doBuyHsPetEgg(p,id); }
+    else if(m.t==='feedhspet'){ doFeedHsPet(p,id,m.itemId); }
+    else if(m.t==='socketgem'){ doSocketGem(p,id,m.slot,m.gemType); }
+    else if(m.t==='tuthu'){
+      if((p.pkScore||0)<=0){ sendTo(id,{t:'toast',text:'Bạn không có điểm PK để tự thú.'}); }
+      else { p.jailed=60; sendTo(id,{t:'toast',text:'🔒 Đã tự thú, giam 60s, điểm PK giảm nhanh trong lúc này.'}); }
+    }
   });
   ws.on('close',()=>{ const p=players[id]; if(p&&p.party&&parties[p.party]){ const pt=parties[p.party];
       pt.members=pt.members.filter(m=>m!==id);
@@ -1632,7 +1759,7 @@ function applyPassiveOnHit(p,id,target,dmg){
 }
 function doBasic(p,id){
   const hit=nearestHostile(p,id,p.basicRange);
-  let dmg=p.basicDmg+POW(p);
+  let dmg=(p.basicDmg+POW(p))*(1+((p.gemBonus&&p.gemBonus.kim)||0)*0.08);
   if(p.cls==='arc' && hit && hit.ent.hp!==undefined && hit.ent.maxhp && (hit.ent.hp/hit.ent.maxhp)<0.3) dmg*=1.5; // Sát Thủ
   if(p.basicType==='melee'){
     if(hit){const a=Math.atan2(hit.ent.y-p.y,hit.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);
@@ -1791,6 +1918,12 @@ function hurtEnemy(e,dmg,byId){ e.hp-=dmg; e.lastHit=byId; hitEv(e.x,e.y-(e.boss
           bcast({t:'toast',text:'🎉 #'+e.lastHit+' săn được Đệ Tử: '+pt.icon+' '+pt.name+'!'});
         } else { killer.gold+=80; bcast({t:'gold',id:e.lastHit,x:killer.x,y:killer.y,val:80,st:0}); }
       }
+      if(killer && Math.random()<0.25){
+        const gk=Object.keys(GEM_TYPES); const g=gk[Math.floor(Math.random()*gk.length)];
+        if(!killer.gemCount)killer.gemCount={hoa:0,thuy:0,moc:0,tho:0,kim:0};
+        killer.gemCount[g]=(killer.gemCount[g]||0)+1;
+        sendTo(e.lastHit,{t:'toast',text:'💎 Nhặt được '+GEM_TYPES[g].name+'!'});
+      }
     }
     else if(Math.random()<0.38){ dropItem(e.x,e.y, Math.random()<0.15?2:1, e.zone); }
   } }
@@ -1877,7 +2010,7 @@ function doEnchant(p,id,itemId){
   if(f.loc==='equip')recompute(p);
   sendInv(p,id); sendQuests(p,id);
 }
-function POW(p){ return p.atkPow + (p.gearAtk||0) + (p.STR||0)*2 + ((p.buffT>0)?(p.buffAtk||0):0); }
+function POW(p){ return (p.atkPow + (p.gearAtk||0) + (p.STR||0)*2 + ((p.buffT>0)?(p.buffAtk||0):0)) * (1+((p.gemBonus&&p.gemBonus.hoa)||0)*0.08); }
 // Ma Kiếm Sĩ: skill tầm xa/khiên ăn thêm Trí Tuệ (hướng "phép"), skill cận chiến vẫn thuần Sức Mạnh (hướng "vật lý") — build lai tùy điểm cộng
 function skDmgPow(p,sk){ let v=POW(p);
   if(p.cls==='blade' && (sk.type==='proj'||sk.type==='nova'||sk.type==='shield')) v+=(p.INT||0)*1.3;
@@ -1893,12 +2026,23 @@ function resourceInfo(p){
   return null;
 }
 function recompute(p){
+  if(p.hspet){
+    const prev=p.hspetApplied||{STR:0,VIT:0,AGI:0,INT:0};
+    for(const k of ['STR','VIT','AGI','INT']) p[k]=(p[k]||0)-prev[k];
+    const heff=(p.hspet.hunger>0)?1:0.5;
+    const cur={STR:Math.round(hspetStatBonus(p.hspet,'STR')*heff),VIT:Math.round(hspetStatBonus(p.hspet,'VIT')*heff),
+               AGI:Math.round(hspetStatBonus(p.hspet,'AGI')*heff),INT:Math.round(hspetStatBonus(p.hspet,'INT')*heff)};
+    for(const k of ['STR','VIT','AGI','INT']) p[k]=(p[k]||0)+cur[k];
+    p.hspetApplied=cur;
+  }
   let ga=0,gh=0;
   for(const s of SLOTS){ const it=p.equip[s]; if(!it)continue; if(it.stat==='atk')ga+=itemVal(it); else gh+=itemVal(it); }
   const mt=p.mounted?MOUNTS.find(x=>x.id===p.mounted):null; const mHp=mt?(mt.hp||0):0;
   const fuseBonus=(p.fusedT>0 && p.pet)?p.pet.lv:0;
-  p.gearAtk=ga+fuseBonus*2; p.gearHp=gh+mHp+fuseBonus*10; p.maxhp=p.baseMaxhp+gh+mHp+fuseBonus*10+(p.VIT||0)*8; if(p.hp>p.maxhp)p.hp=p.maxhp;
-  p.maxmp=p.baseMaxmp+(p.INT||0)*4; if(p.mp>p.maxmp)p.mp=p.maxmp;
+  const gems=computeGemBonus(p); p.gemBonus=gems;
+  p.gearAtk=ga+fuseBonus*2; p.gearHp=gh+mHp+fuseBonus*10;
+  p.maxhp=Math.round((p.baseMaxhp+gh+mHp+fuseBonus*10+(p.VIT||0)*8)*(1+gems.moc*0.08)); if(p.hp>p.maxhp)p.hp=p.maxhp;
+  p.maxmp=Math.round((p.baseMaxmp+(p.INT||0)*4)*(1+gems.thuy*0.08)); if(p.mp>p.maxmp)p.mp=p.maxmp;
 }
 function allocStat(p,id,stat){
   if(p.statPts<=0)return; if(!['STR','VIT','AGI','INT'].includes(stat))return;
@@ -1935,7 +2079,7 @@ function doUnequip(p,id,slot){
   if(!p.equip[slot]||p.inv.length>=24)return;
   p.inv.push(p.equip[slot]); p.equip[slot]=null; recompute(p); sendInv(p,id);
 }
-function sendInv(p,id){ sendTo(id,{t:'inv',inv:p.inv,equip:p.equip,gAtk:p.gearAtk,gHp:p.gearHp}); }
+function sendInv(p,id){ sendTo(id,{t:'inv',inv:p.inv,equip:p.equip,gAtk:p.gearAtk,gHp:p.gearHp,gemCount:p.gemCount}); }
 function gainXP(p,amount){
   p.xp+=amount;
   while(p.xp>=p.xpNext){ p.xp-=p.xpNext; p.lv++; p.xpNext=Math.round(p.xpNext*1.35);
@@ -1982,12 +2126,20 @@ function doChat(p,id,text){
   if(typeof text!=='string')return; text=text.trim().slice(0,120); if(!text)return;
   if(text==='/admin'){
     p.gold=(p.gold||0)+99999; p.stones=(p.stones||0)+999;
-    gainXP(p,500000);
+    const target=30;
+    if(p.lv<target){
+      const add=target-p.lv; p.lv=target;
+      p.statPts=(p.statPts||0)+add*3; p.skillPts=(p.skillPts||0)+add;
+      let xn=p.xpNext||100; for(let i=0;i<add;i++)xn=Math.round(xn*1.35); p.xpNext=xn;
+    }
+    recompute(p); p.hp=p.maxhp; p.mp=p.maxmp;
     if(p.pet){ p.pet.fullness=100; }
     p.dungeonEntries=DUNGEON_MAX_ENTRIES;
     sendInv(p,id);
+    sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout});
     sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
-    sendTo(id,{t:'toast',text:'🛠️ Admin: đã cộng tài nguyên để test.'});
+    bcast({t:'level',id,lv:p.lv,x:p.x,y:p.y}); // CHỈ 1 lần duy nhất, không lặp qua gainXP (tránh dồn dập hiệu ứng gây đứng máy)
+    sendTo(id,{t:'toast',text:'🛠️ Admin: Lv '+p.lv+' + tài nguyên đầy để test.'});
     return;
   }
   bcast({t:'chatmsg',id,cls:p.cls,text,channel:'world'});
@@ -2073,11 +2225,26 @@ function doGuildChat(p,id,text){
 function hurtPlayer(o,dmg,atkPid,atkEnemyObj,noReflect){ if(o.dead||o.iframe>0)return;
   if(!noReflect){ const dodge=Math.min(0.35,(o.AGI||0)*0.0012);
     if(Math.random()<dodge){ hitEv(o.x,o.y-16,'Né!',false); return; } }
+  dmg*=(1-((o.gemBonus&&o.gemBonus.tho)||0)*0.08);
   if(o.shieldHP>0){ const absorb=Math.min(o.shieldHP,dmg); o.shieldHP-=absorb; dmg-=absorb; if(dmg<=0){hitEv(o.x,o.y-16,0,false);return;} }
   if(o.cls==='war'){ if(o.ironWillT>0){dmg*=0.8;} else if((o.hp/o.maxhp)<0.3 && (o.passT||0)<=0){ o.ironWillT=3; o.passT=15; dmg*=0.8; } }
   const dealt=dmg;
   o.hp-=dmg;o.hurtT=0; hitEv(o.x,o.y-16,dmg,false);
-  if(o.hp<=0){o.dead=true;o.respawnT=2.5;o.hp=0;}
+  if(o.hp<=0){
+    o.dead=true;o.respawnT=2.5;o.hp=0;
+    if(atkPid && !noReflect && players[atkPid] && players[atkPid]!==o){
+      const killer=players[atkPid];
+      killer.pkScore=Math.min(200,(killer.pkScore||0)+15);
+      sendTo(atkPid,{t:'toast',text:'⚔️ Hạ gục #'+atkPid+'! Điểm PK: '+killer.pkScore});
+    }
+    const pk=o.pkScore||0;
+    if(pk>0){
+      const goldLoss=Math.round((o.gold||0)*Math.min(0.5,pk*0.003)); o.gold=Math.max(0,(o.gold||0)-goldLoss);
+      let dropped=false;
+      if(pk>=80){ for(const s of SLOTS){ if(o.equip[s] && Math.random()<0.15){ dropItem(o.x,o.y,o.equip[s].tier,o.zone); o.equip[s]=null; dropped=true; break; } } }
+      if(goldLoss>0||dropped) recompute(o), sendTo(idOf(o),{t:'toast',text:'💀 Điểm PK cao, mất '+goldLoss+'🪙'+(dropped?' + rớt 1 món đồ':'')+'!'});
+    }
+  }
   if(!noReflect){ const refl=Math.min(0.3,(o.VIT||0)*0.0015);
     if(Math.random()<refl){ const rdmg=Math.round(dealt*0.35);
       if(atkPid && players[atkPid]) hurtPlayer(players[atkPid],rdmg,null,null,true);
@@ -2116,6 +2283,12 @@ setInterval(()=>{
     const nnid=nearest?nearest.id:null;
     if(p.nearNpc!==nnid){ p.nearNpc=nnid; sendTo(id,{t:'nearnpc',npcId:nnid,name:nearest?nearest.name:null,icon:nearest?nearest.icon:null,kind:nearest?nearest.kind:null}); }
     if(p.fusedT>0){ p.fusedT-=dt; if(p.fusedT<=0){ p.fusedT=0; p.fusionCd=FUSION_CD; recompute(p); sendTo(id,{t:'toast',text:'Hợp thể kết thúc, Đệ Tử tách ra.'}); } }
+    if((p.pkScore||0)>0){
+      if(p.jailed>0){ p.jailed-=dt; p.pkScore=Math.max(0,p.pkScore-dt*(1/20)); if(p.jailed<=0){p.jailed=0; sendTo(id,{t:'toast',text:'Đã mãn hạn tự thú. Điểm PK: '+Math.round(p.pkScore)});} }
+      else p.pkScore=Math.max(0,p.pkScore-dt*(1/300));
+    }
+    if(p.hspet){ const wasHungry=p.hspet.hunger<=0; p.hspet.hunger=Math.max(0,(p.hspet.hunger||100)-dt*(100/1800));
+      if(!wasHungry && p.hspet.hunger<=0){ recompute(p); sendTo(id,{t:'toast',text:'Thú Cưng đói rồi, hiệu quả giảm — cho ăn đi!'}); } }
     else if(p.fusionCd>0){ p.fusionCd=Math.max(0,p.fusionCd-dt); }
     if(p.pet){ if(p.fusedT<=0) tickPet(p,id,dt); else { p.pet.x=p.x; p.pet.y=p.y; p.pet.zone=p.zone; } }
   }
@@ -2143,7 +2316,7 @@ setInterval(()=>{
   const psPublic={}; for(const id in players){const p=players[id];if(!p.chosen)continue;
     try{
       psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,
-        spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted};
+        spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0)};
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
   const es={}; for(const eid in enemies){const e=enemies[eid];es[eid]={x:r1(e.x),y:r1(e.y),zone:e.zone,hp:r1(e.hp),maxhp:e.maxhp,dead:e.dead,boss:e.boss,r:e.r};}
@@ -2159,7 +2332,9 @@ setInterval(()=>{
       const mine=Object.assign({},psPublic[id],{gold:p.gold,stones:p.stones,xp:p.xp,xpNext:p.xpNext,gAtk:p.gearAtk,gHp:p.gearHp,
         STR:p.STR,VIT:p.VIT,AGI:p.AGI,INT:p.INT,statPts:p.statPts,skillPts:p.skillPts,res:resourceInfo(p),
         pet:p.pet?{type:p.pet.type,lv:p.pet.lv,xp:p.pet.xp,xpNext:p.pet.xpNext,fullness:Math.round(p.pet.fullness)}:null,
-        fusedT:Math.round(p.fusedT||0),fusionCd:Math.round(p.fusionCd||0)});
+        fusedT:Math.round(p.fusedT||0),fusionCd:Math.round(p.fusionCd||0),
+        hspet:p.hspet?{stat:p.hspet.stat,hunger:Math.round(p.hspet.hunger)}:null,
+        pkScore:Math.round(p.pkScore||0),jailed:Math.round(p.jailed||0)});
       const psOut=Object.assign({},psPublic,{[id]:mine});
       sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd});
     }catch(err){ console.error('⚠️ Lỗi gửi state cho #'+id+' (đã chặn, không ảnh hưởng người khác):', err && err.message); }
@@ -2168,4 +2343,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.44 (fusion + clean admin) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.48 (PK system) chạy ở cổng '+PORT));
