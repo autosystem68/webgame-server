@@ -568,7 +568,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.48 · PK system</div>
+  <div id="ver">v0.49 · pull fix + admin companions</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1857,14 +1857,16 @@ function execSkill(p,id,sk,rank){
   else if(sk.type==='pull'){
     if((p.authority||0)<sk.authCost)return; p.authority-=sk.authCost;
     const h=nearestHostile(p,id,sk.range);
-    if(h){ const dmg=applyPassiveOnHit(p,id,null,sk.dmg+POW(p));
+    if(h && h.ent!==p){
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmg+POW(p))*mul);
       const a=Math.atan2(h.ent.y-p.y,h.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);
-      const cd=Math.min(sk.pullDist,Math.hypot(h.ent.x-p.x,h.ent.y-p.y)-40);
-      if(cd>0){ h.ent.x-=Math.cos(a)*cd; h.ent.y-=Math.sin(a)*cd; }
-      if(h.tp==='e'){ clampEnemyPos(h.ent); hurtEnemy(h.ent,dmg,id); } else { clampPos(h.ent); hurtPlayer(h.ent,dmg*PVP,id); }
-      fxEv('dash',h.ent.x,h.ent.y,45,-p.fx,-p.fy,0);
+      const pullDist=Math.min(sk.pullDist,Math.max(0,Math.hypot(h.ent.x-p.x,h.ent.y-p.y)-40));
+      const tx=h.ent.x-Math.cos(a)*pullDist, ty=h.ent.y-Math.sin(a)*pullDist;
+      if(h.tp==='e'){ h.ent.x=tx; h.ent.y=ty; clampEnemyPos(h.ent); hurtEnemy(h.ent,dmg,id); }
+      else { h.ent.x=tx; h.ent.y=ty; clampPos(h.ent); hurtPlayer(h.ent,dmg*PVP,id); }
+      fxEv('dash',h.ent.x,h.ent.y,45,-p.fx,-p.fy,0); fxEv('nova',h.ent.x,h.ent.y,45,0,0,70);
     }
-    fxEv('swing',p.x,p.y,45,p.fx,p.fy,0);
+    fxEv('nova',p.x,p.y,45,0,0,40);
   }
   else if(sk.type==='command'){
     if((p.authority||0)<sk.authCost)return; p.authority-=sk.authCost;
@@ -2132,14 +2134,18 @@ function doChat(p,id,text){
       p.statPts=(p.statPts||0)+add*3; p.skillPts=(p.skillPts||0)+add;
       let xn=p.xpNext||100; for(let i=0;i<add;i++)xn=Math.round(xn*1.35); p.xpNext=xn;
     }
+    if(p.pet){ p.pet.fullness=100; } else { const pt=randPetType(); const bs=petBaseStats(5);
+      p.pet={type:pt.id,lv:5,xp:0,xpNext:100,atk:bs.atk,fullness:100,x:p.x,y:p.y,zone:p.zone}; }
+    if(!p.hspet){ p.hspet={stat:{STR:40,VIT:40,AGI:40,INT:40},hunger:100}; } else { p.hspet.hunger=100; }
+    if(!p.mounts||!p.mounts.length){ p.mounts=['dragon']; p.mounted='dragon'; }
     recompute(p); p.hp=p.maxhp; p.mp=p.maxmp;
-    if(p.pet){ p.pet.fullness=100; }
     p.dungeonEntries=DUNGEON_MAX_ENTRIES;
     sendInv(p,id);
     sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout});
     sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
+    sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
     bcast({t:'level',id,lv:p.lv,x:p.x,y:p.y}); // CHỈ 1 lần duy nhất, không lặp qua gainXP (tránh dồn dập hiệu ứng gây đứng máy)
-    sendTo(id,{t:'toast',text:'🛠️ Admin: Lv '+p.lv+' + tài nguyên đầy để test.'});
+    sendTo(id,{t:'toast',text:'🛠️ Admin: Lv '+p.lv+' + tài nguyên + Đệ Tử/Thú Cưng/Thú Cưỡi đầy đủ để test.'});
     return;
   }
   bcast({t:'chatmsg',id,cls:p.cls,text,channel:'world'});
@@ -2343,4 +2349,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.48 (PK system) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.49 (pull fix + admin companions) chạy ở cổng '+PORT));
