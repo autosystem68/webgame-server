@@ -626,7 +626,7 @@ function renderChr(){
   });
   var skg=document.getElementById('skgrid'); skg.innerHTML='';
   var hdr=document.createElement('div'); hdr.style.cssText='font-size:11px;color:#9a8a6a;margin:4px 0 6px;max-width:340px;width:100%';
-  hdr.textContent='Kỹ Năng đã học (chạm Q/W/E/R để trang bị vào ô đó):'; skg.appendChild(hdr);
+  hdr.textContent='Kỹ Năng đã học (chạm nhanh Q/W/E/R để trang bị/tung tự động — GIỮ rồi kéo để tự ngắm hướng/khoảng cách với skill có hướng):'; skg.appendChild(hdr);
   var myLv=(players[myId]&&players[myId].lv)||1;
   var STATLBL={STR:'Sức Mạnh',VIT:'Sinh Lực',AGI:'Nhanh Nhẹn',INT:'Trí Tuệ'};
   myFull.forEach(function(s){
@@ -1289,15 +1289,40 @@ setInterval(function(){ if(ws.readyState===1 && chosen){
   ws.send(JSON.stringify({t:'input',x:mvx,y:mvy}));
 }},33);
 
-function cast(k){ if(cd[k]>0)return; var me=players[myId];
+function cast(k,aim){ if(cd[k]>0)return; var me=players[myId];
   if(me && me.mp<SKmp[k]){ flash(k); return; }
-  if(ws.readyState===1) ws.send(JSON.stringify({t:'skill',k:k}));
+  if(ws.readyState===1) ws.send(JSON.stringify(aim?{t:'skill',k:k,aim:aim}:{t:'skill',k:k}));
   cd[k]=SKdur[k];
 }
 function flash(k){var id={b:'sB',q:'sQ',w:'sW',e:'sE',r:'sR'}[k];var el=document.getElementById(id);
   el.animate([{transform:'translateX(-3px)'},{transform:'translateX(3px)'},{transform:'translateX(0)'}],{duration:140});}
 function bindBtn(id,k){document.getElementById(id).addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();cast(k);});}
-bindBtn('sB','b');bindBtn('sQ','q');bindBtn('sW','w');bindBtn('sE','e');bindBtn('sR','r');
+var aimState={active:false,slot:null,dx:0,dy:1,mag:0,ox:0,oy:0};
+var AIM_MAX_PX=90;
+function bindSkillBtn(id,k){
+  var btn=document.getElementById(id);
+  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false;
+  btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
+    if(cd[k]>0)return;
+    startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;
+    try{btn.setPointerCapture(ev.pointerId);}catch(e){}
+    holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},160);
+  });
+  btn.addEventListener('pointermove',function(ev){
+    if(!holding)return;
+    var dx=ev.clientX-startX, dy=ev.clientY-startY, d=Math.hypot(dx,dy);
+    if(d>4){ dragged=true; aimState.dx=dx/d; aimState.dy=dy/d; aimState.mag=Math.min(1,d/AIM_MAX_PX); }
+  });
+  function release(ev){
+    clearTimeout(holdTimer);
+    if(holding){ holding=false; aimState.active=false;
+      if(dragged) cast(k,{dx:aimState.dx,dy:aimState.dy,mag:aimState.mag}); else cast(k);
+    } else { cast(k); }
+  }
+  btn.addEventListener('pointerup',release);
+  btn.addEventListener('pointercancel',function(){clearTimeout(holdTimer);holding=false;aimState.active=false;});
+}
+bindBtn('sB','b');bindSkillBtn('sQ','q');bindSkillBtn('sW','w');bindSkillBtn('sE','e');bindSkillBtn('sR','r');
 
 // PC: mũi tên đi, Q W E R + Space đánh
 var keys={};
@@ -1519,6 +1544,15 @@ function frame(now){
     ctx.globalAlpha=.9;ctx.strokeStyle='#e0b062';ctx.lineWidth=2;ctx.beginPath();ctx.arc(joy.bx,joy.by,RAD,0,7);ctx.stroke();
     ctx.fillStyle='#e0b062';ctx.beginPath();ctx.arc(joy.kx,joy.ky,20,0,7);ctx.fill();ctx.globalAlpha=1;}
 
+  if(aimState.active){
+    var ex=aimState.ox+aimState.dx*aimState.mag*AIM_MAX_PX, ey=aimState.oy+aimState.dy*aimState.mag*AIM_MAX_PX;
+    ctx.save();ctx.globalAlpha=.8;ctx.strokeStyle='#ff9a4a';ctx.lineWidth=3;ctx.setLineDash([6,5]);
+    ctx.beginPath();ctx.moveTo(aimState.ox,aimState.oy);ctx.lineTo(ex,ey);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='#ff9a4a';ctx.beginPath();ctx.arc(ex,ey,10+aimState.mag*8,0,7);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,10+aimState.mag*8,0,7);ctx.stroke();
+    ctx.restore();
+  }
+
   requestAnimationFrame(frame);
 }
 function updateBtns(){
@@ -1659,7 +1693,7 @@ wss.on('connection',(ws)=>{
     if(m.t==='input'){
       p.ix=clamp(m.x); p.iy=clamp(m.y);
       const d=Math.hypot(p.ix,p.iy); if(d>0.2){p.fx=p.ix/d;p.fy=p.iy/d;}
-    } else if(m.t==='skill'){ doSkill(id,m.k); }
+    } else if(m.t==='skill'){ doSkill(id,m.k,m.aim); }
     else if(m.t==='equip'){ doEquip(p,id,m.itemId); }
     else if(m.t==='unequip'){ doUnequip(p,id,m.slot); }
     else if(m.t==='enchant'){ doEnchant(p,id,m.itemId); }
@@ -1829,7 +1863,7 @@ function fullSkillList(p){
 }
 function inCone(p,t,range,arc){ const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy); if(d>range)return false;
   const ang=Math.atan2(dy,dx),fa=Math.atan2(p.fy,p.fx); let df=Math.abs(ang-fa); if(df>Math.PI)df=2*Math.PI-df; return df<=arc; }
-function doSkill(id,k){
+function doSkill(id,k,aim){
   const p=players[id]; if(!p||p.dead)return;
   if(k==='b'){ if(p.cd.b>0)return; let bcd=Math.max(0.15,p.basicCd-(p.AGI||0)*0.01);
     if(p.cls==='war' && (p.fervor||0)>=80) bcd*=0.75; // Blood Frenzy: đánh nhanh hơn
@@ -1839,6 +1873,11 @@ function doSkill(id,k){
   if(p.cd[k]>0 || p.mp<sk.mp)return;
   if(sk.authCost && (p.authority||0)<sk.authCost)return;
   if(sk.hpReq && (p.hp/p.maxhp)>sk.hpReq)return;
+  if(aim && typeof aim.dx==='number' && typeof aim.dy==='number'){
+    const d=Math.hypot(aim.dx,aim.dy);
+    if(d>0.1){ p.fx=aim.dx/d; p.fy=aim.dy/d; p.aimMag=Math.max(0.25,Math.min(1,aim.mag!==undefined?aim.mag:1)); }
+    else p.aimMag=1;
+  } else p.aimMag=1;
   p.mp-=sk.mp; p.cd[k]=Math.max(0.3,sk.cd-(p.INT||0)*0.02); execSkill(p,id,sk,(p.skRank&&p.skRank[sid])||1);
 }
 function rankMul(rank){ return 1+(rank-1)*0.22; } // rank 1..5 → tới +88% dmg
@@ -1988,7 +2027,7 @@ function execSkill(p,id,sk,rank){
     if(hit){ addStatus(hit.ent,'huntmark',{dur:sk.dur,data:{bonus:sk.bonusPct}}); fxEv('ring',hit.ent.x,hit.ent.y,120,0,0,30); }
   }
   else if(sk.type==='trap'){
-    const tx=p.x+p.fx*sk.range, ty=p.y+p.fy*sk.range;
+    const rng=sk.range*(p.aimMag||1); const tx=p.x+p.fx*rng, ty=p.y+p.fy*rng;
     traps.push({x:tx,y:ty,zone:p.zone,owner:id,triggerR:sk.triggerR,rootDur:sk.rootDur,life:sk.life});
     fxEv('ring',tx,ty,90,0,0,sk.triggerR);
   }
@@ -2049,7 +2088,7 @@ function execSkill(p,id,sk,rank){
     fxEv('swing',p.x,p.y,20,p.fx,p.fy,0);
   }
   else if(sk.type==='frostprism'){
-    const cx=p.x+p.fx*sk.range, cy=p.y+p.fy*sk.range;
+    const rng2=sk.range*(p.aimMag||1); const cx=p.x+p.fx*rng2, cy=p.y+p.fy*rng2;
     mageReaction(p,sk);
     crystals.push({x:cx,y:cy,zone:p.zone,radius:sk.radius,life:sk.dur,owner:id});
     fxEv('ring',cx,cy,200,0,0,sk.radius);
