@@ -582,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.56 · preview vùng ảnh hưởng thật</div>
+  <div id="ver">v0.57 · Dấu Ấn nhắm chuẩn xác</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1558,6 +1558,13 @@ function frame(now){
       } else {
         ctx.beginPath();ctx.moveTo(apx,apy);ctx.lineTo(apx+aimState.dx*maxR,apy+aimState.dy*maxR);ctx.lineWidth=4;ctx.stroke();
       }
+      if(aimSk.type==='huntmark'){
+        var hax=apx+aimState.dx*maxR*aimState.mag, hay=apy+aimState.dy*maxR*aimState.mag;
+        var bestD=60,bestX=0,bestY=0,bestR=15,found=false;
+        for(var heid in enemies){var he=enemies[heid]; if(he.dead||he.zone!==myZone)continue; var hd=Math.hypot(he.x-hax,he.y-hay); if(hd<bestD){bestD=hd;bestX=he.x;bestY=he.y;bestR=(he.r||14)+6;found=true;}}
+        for(var hpid in players){ if(hpid==myId)continue; var ho=players[hpid]; if(!ho.chosen||ho.dead||ho.zone!==myZone)continue; var hd2=Math.hypot(ho.x-hax,ho.y-hay); if(hd2<bestD){bestD=hd2;bestX=ho.x;bestY=ho.y;bestR=21;found=true;}}
+        if(found){ ctx.save();ctx.globalAlpha=0.9;ctx.strokeStyle='#ffe070';ctx.lineWidth=3;ctx.beginPath();ctx.arc(bestX,bestY,bestR,0,7);ctx.stroke();ctx.restore(); }
+      }
       ctx.restore();
     }
   }
@@ -1824,7 +1831,7 @@ const SKILLS = {
     {id:'a2',name:'Xuyên Giáp Trường',icon:'🏹',type:'pierce',mp:16,cd:2, unlockLv:3, dmg:32,speed:760,r:6,maxHits:4,falloff:0.8,scaleKey:'dmg',
       desc:'Bắn 1 mũi tên XUYÊN QUA tối đa 4 mục tiêu thẳng hàng — mỗi mục tiêu sau nhận 80% dame mục tiêu trước (giảm dần). Rất mạnh khi địch đứng thành hàng.'},
     {id:'a3',name:'Dấu Ấn Thợ Săn',icon:'🎯',type:'huntmark',mp:14,cd:6, unlockLv:5, range:400,dur:6,bonusPct:0.25,
-      desc:'Đánh dấu 1 mục tiêu trong 6s — MỌI đòn đánh (thường + skill) của bạn lên nó +25% sát thương. Ưu tiên đánh dấu trước khi combo.'},
+      desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đánh dấu (nhả tay sẽ nhắm đúng kẻ gần điểm ngắm nhất — nhắm hụt sẽ không trúng ai!). Bấm nhanh không kéo = tự nhắm gần nhất cho tiện. Đánh dấu 6s — MỌI đòn đánh của bạn lên nó +25% sát thương.'},
     {id:'a4',name:'Bẫy Rừng Xanh',icon:'🕸️',type:'trap',   mp:20,cd:9, unlockLv:7, range:120,triggerR:26,rootDur:1.8,life:14,
       desc:'Đặt 1 bẫy vô hình phía trước (tồn tại 14s). Kẻ địch đầu tiên bước vào bị Trói cứng 1.8s + tự động dính Dấu Ấn Thợ Săn.'},
     {id:'a5',name:'Tên Sao Rơi', icon:'🌠',type:'starfall',mp:30,cd:11, unlockLv:10,range:480,dmg:46,stunDur:1.0,scaleKey:'dmg',
@@ -1900,9 +1907,9 @@ function doSkill(id,k,aim){
   if(sk.hpReq && (p.hp/p.maxhp)>sk.hpReq)return;
   if(aim && typeof aim.dx==='number' && typeof aim.dy==='number'){
     const d=Math.hypot(aim.dx,aim.dy);
-    if(d>0.1){ p.fx=aim.dx/d; p.fy=aim.dy/d; p.aimMag=Math.max(0.25,Math.min(1,aim.mag!==undefined?aim.mag:1)); }
-    else p.aimMag=1;
-  } else p.aimMag=1;
+    if(d>0.1){ p.fx=aim.dx/d; p.fy=aim.dy/d; p.aimMag=Math.max(0.25,Math.min(1,aim.mag!==undefined?aim.mag:1)); p.wasAimed=true; }
+    else { p.aimMag=1; p.wasAimed=false; }
+  } else { p.aimMag=1; p.wasAimed=false; }
   p.mp-=sk.mp; p.cd[k]=Math.max(0.3,sk.cd-(p.INT||0)*0.02); execSkill(p,id,sk,(p.skRank&&p.skRank[sid])||1);
 }
 function rankMul(rank){ return 1+(rank-1)*0.22; } // rank 1..5 → tới +88% dmg
@@ -2048,7 +2055,16 @@ function execSkill(p,id,sk,rank){
     fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
   }
   else if(sk.type==='huntmark'){
-    const hit=nearestHostile(p,id,sk.range);
+    let hit=null;
+    if(p.wasAimed){
+      const ax=p.x+p.fx*sk.range*p.aimMag, ay=p.y+p.fy*sk.range*p.aimMag;
+      let best=60,bestEnt=null,bestTp=null;
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ax,e.y-ay); if(d<best){best=d;bestEnt=e;bestTp='e';}}
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
+      if(bestEnt) hit={ent:bestEnt,tp:bestTp};
+      if(!hit){ fxEv('ring',ax,ay,0,0,0,20); } // ngắm hụt — không trúng ai, vẫn hiện vòng báo hụt tại điểm ngắm
+    }
+    if(!hit && !p.wasAimed) hit=nearestHostile(p,id,sk.range); // bấm nhanh không ngắm = tiện tự nhắm gần nhất
     if(hit){ addStatus(hit.ent,'huntmark',{dur:sk.dur,data:{bonus:sk.bonusPct}}); fxEv('ring',hit.ent.x,hit.ent.y,120,0,0,30); }
   }
   else if(sk.type==='trap'){
@@ -2837,4 +2853,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.56 (preview vùng ảnh hưởng thật) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.57 (Dấu Ấn nhắm chuẩn xác) chạy ở cổng '+PORT));
