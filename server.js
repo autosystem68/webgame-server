@@ -582,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.50 · Cấm Vệ Quân (summon)</div>
+  <div id="ver">v0.51 · redesign nền tảng (formula+status engine)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -2038,7 +2038,39 @@ function doEnchant(p,id,itemId){
   if(f.loc==='equip')recompute(p);
   sendInv(p,id); sendQuests(p,id);
 }
-function POW(p){ return (p.atkPow + (p.gearAtk||0) + (p.STR||0)*2 + ((p.buffT>0)?(p.buffAtk||0):0)) * (1+((p.gemBonus&&p.gemBonus.hoa)||0)*0.08); }
+function POW(p){
+  const wpn = p.atkPow + (p.gearAtk||0);
+  const buff = (p.buffT>0)?(p.buffAtk||0):0;
+  const STR=p.STR||0, VIT=p.VIT||0, AGI=p.AGI||0, INT=p.INT||0;
+  let statPart;
+  if(p.cls==='war')       statPart = STR*1.20 + AGI*0.15;
+  else if(p.cls==='mage') statPart = INT*1.30;
+  else if(p.cls==='arc')  statPart = AGI*1.10 + STR*0.20;
+  else if(p.cls==='blade')statPart = Math.max(STR,INT)*0.9 + Math.min(STR,INT)*0.4; // tạm thời tới khi làm stance thật (Phase Blade)
+  else if(p.cls==='cmd')  statPart = STR*0.7; // CỐ Ý thấp — Command không cộng thẳng dmg cá nhân, chỉ khuếch đại pet/summon
+  else statPart = STR*2; // fallback an toàn nếu chưa chọn class
+  return (wpn + statPart + buff) * (1+((p.gemBonus&&p.gemBonus.hoa)||0)*0.08);
+}
+// ---- STATUS EFFECT ENGINE (nền tảng dùng chung — Phase "móng nhà" của tái thiết kế skill, xem CHARACTER_SYSTEM_REDESIGN.md) ----
+// Dùng cho MỌI cơ chế cộng dồn/theo thời gian mới: Wound (War), Mark (Elf/Mage/Cmd), Resonance (Blade), Pursuit (War), v.v.
+// Không đụng tới field cũ (slowT/shieldHP/buffT...) — các skill hiện tại tiếp tục chạy y hệt, không bị ảnh hưởng.
+function addStatus(ent,kind,opts){
+  opts=opts||{};
+  if(!ent.statusEff) ent.statusEff={};
+  const cur = ent.statusEff[kind] || {stacks:0,expireT:0,data:{}};
+  cur.stacks = Math.min(opts.maxStacks||99, cur.stacks + (opts.stacks!==undefined?opts.stacks:1));
+  cur.expireT = opts.refresh===false ? Math.max(cur.expireT,opts.dur||0) : (opts.dur||cur.expireT);
+  if(opts.data) cur.data = Object.assign(cur.data||{}, opts.data);
+  ent.statusEff[kind]=cur;
+  return cur;
+}
+function getStatus(ent,kind){ return (ent.statusEff && ent.statusEff[kind]) || null; }
+function statusStacks(ent,kind){ const s=getStatus(ent,kind); return s?s.stacks:0; }
+function clearStatus(ent,kind){ if(ent.statusEff) delete ent.statusEff[kind]; }
+function tickStatuses(ent,dt){
+  if(!ent.statusEff) return;
+  for(const k in ent.statusEff){ const s=ent.statusEff[k]; s.expireT-=dt; if(s.expireT<=0) delete ent.statusEff[k]; }
+}
 // Ma Kiếm Sĩ: skill tầm xa/khiên ăn thêm Trí Tuệ (hướng "phép"), skill cận chiến vẫn thuần Sức Mạnh (hướng "vật lý") — build lai tùy điểm cộng
 function skDmgPow(p,sk){ let v=POW(p);
   if(p.cls==='blade' && (sk.type==='proj'||sk.type==='nova'||sk.type==='shield')) v+=(p.INT||0)*1.3;
@@ -2319,6 +2351,7 @@ setInterval(()=>{
       if(p.jailed>0){ p.jailed-=dt; p.pkScore=Math.max(0,p.pkScore-dt*(1/20)); if(p.jailed<=0){p.jailed=0; sendTo(id,{t:'toast',text:'Đã mãn hạn tự thú. Điểm PK: '+Math.round(p.pkScore)});} }
       else p.pkScore=Math.max(0,p.pkScore-dt*(1/300));
     }
+    tickStatuses(p,dt);
     if(p.hspet){ const wasHungry=p.hspet.hunger<=0; p.hspet.hunger=Math.max(0,(p.hspet.hunger||100)-dt*(100/1800));
       if(!wasHungry && p.hspet.hunger<=0){ recompute(p); sendTo(id,{t:'toast',text:'Thú Cưng đói rồi, hiệu quả giảm — cho ăn đi!'}); } }
     else if(p.fusionCd>0){ p.fusionCd=Math.max(0,p.fusionCd-dt); }
@@ -2328,7 +2361,7 @@ setInterval(()=>{
   for(const eid in enemies){const e=enemies[eid];
     if(e.dead){e.respawnT-=dt;if(e.respawnT<=0){const wasBoss=e.boss,z=e.zone;delete enemies[eid];
       if(wasBoss){ if(z==='dungeon')spawnBoss(z); } else spawnEnemy(z);}continue;}
-    if(e.atk>0)e.atk-=dt; if(e.slowT>0)e.slowT-=dt;
+    if(e.atk>0)e.atk-=dt; if(e.slowT>0)e.slowT-=dt; tickStatuses(e,dt);
     let tp=null,best=1e9;
     for(const id in players){const p=players[id];if(!p.chosen||p.dead||p.zone!==e.zone)continue;const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<best){best=d;tp=p;}}
     const espd=e.spd*((e.slowT>0)?(e.slowMul||1):1);
@@ -2378,4 +2411,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.50 (Cấm Vệ Quân summon) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.51 (redesign nền tảng: formula+status engine) chạy ở cổng '+PORT));
