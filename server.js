@@ -582,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.51 · redesign nền tảng (formula+status engine)</div>
+  <div id="ver">v0.52 · Phase War-A (Q/W/E/R + Momentum)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1575,7 +1575,7 @@ wss.on('connection',(ws)=>{
     buffT:0,buffAtk:0,buffSpdMul:1,
     STR:0,VIT:0,AGI:0,INT:0,statPts:0,skillPts:0,skRank:{},loadout:null,
     shieldHP:0,shieldT:0,slowT:0,slowMul:1,
-    passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,
+    passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,counterT:0,counterDmg:0,momT:0,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
     dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,hspet:null,hspetApplied:null,
     gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,summon:null,
@@ -1681,10 +1681,10 @@ function hitEv(x,y,val,foe){bcast({t:'hit',x,y,val:(typeof val==='number'?Math.r
 // ---- BỘ SKILL RIÊNG TỪNG CLASS (Q/W/E/R) ----
 const SKILLS = {
   war: [
-    {id:'w1',name:'Lướt',       icon:'💨',type:'dash', mp:10,cd:2.0, unlockLv:2,  dist:155},
-    {id:'w2',name:'Chém Xoáy',  icon:'🌀',type:'cone', mp:16,cd:1.1, unlockLv:3,  range:115,arc:1.05,dmg:26},
-    {id:'w3',name:'Chấn Động',  icon:'💥',type:'nova', mp:28,cd:5,   unlockLv:5,  radius:135,dmg:40},
-    {id:'w4',name:'Cuồng Nộ',   icon:'🔥',type:'buff', mp:55,cd:14,  unlockLv:7,  dur:6,atk:22,spdmul:1.25,radius:150,dmg:44},
+    {id:'w1',name:'Bước Săn Mồi',icon:'👣',type:'predstep',mp:12,cd:5,   unlockLv:2,  dist:150},
+    {id:'w2',name:'Chém Rộng',   icon:'🌀',type:'warcleave',mp:16,cd:2.5, unlockLv:3,  rangeIn:75,rangeOut:135,arc:1.05,dmgIn:34,dmgOut:20},
+    {id:'w3',name:'Phản Đòn Sắt',icon:'🛡️',type:'wcounter',mp:20,cd:8,   unlockLv:5,  dur:1.0,counterDmg:36},
+    {id:'w4',name:'Chém Kết Liễu',icon:'💀',type:'wexecute',mp:35,cd:11, unlockLv:7,  range:110,baseDmg:30},
     {id:'w5',name:'Khiên Gang', icon:'🛡️',type:'shield',mp:22,cd:9, unlockLv:10, amount:60,dur:5, reqStat:'VIT',reqVal:15},
     {id:'w6',name:'Hút Sinh Kiếm',icon:'🩸',type:'lifesteal',mp:18,cd:3.5,unlockLv:13,range:100,dmg:30,lsPct:0.6, reqStat:'STR',reqVal:15},
     {id:'w7',name:'Trảm Cước',  icon:'❄️',type:'slow', mp:26,cd:8,   unlockLv:16, radius:130,dmg:20,slowMul:0.5,slowDur:2.5},
@@ -1736,7 +1736,7 @@ const SKILLS = {
 };
 // ---- PASSIVE nội tại riêng từng class (LOL-signature style) ----
 const PASSIVES = {
-  war:  {name:'Ý Chí Sắt',  desc:'Máu <30% → giảm 20% sát thương nhận 3s (hồi sau 15s)'},
+  war:  {name:'Huyết Chiến (Momentum)', desc:'Đánh/chịu dame tích Chiến Ý — Battle Ready (40+): +7% dame, Blood Frenzy (80+): +15% dame, +tốc đánh, -10% dame nhận. Giảm dần nếu ngừng combat 3s. (Ý Chí Sắt: máu <30% → -20% dame nhận 3s, hồi sau 15s)'},
   mage: {name:'Tích Tụ Phép',desc:'Đòn skill thứ 3 liên tiếp trúng cùng mục tiêu → nổ thêm 40% dmg'},
   arc:  {name:'Sát Thủ',    desc:'Đánh thường vào mục tiêu <30% máu → x1.5 sát thương'},
   blade:{name:'Song Tu',    desc:'Skill trúng địch → đòn thường tiếp theo +50% sát thương'},
@@ -1759,7 +1759,9 @@ function inCone(p,t,range,arc){ const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy);
   const ang=Math.atan2(dy,dx),fa=Math.atan2(p.fy,p.fx); let df=Math.abs(ang-fa); if(df>Math.PI)df=2*Math.PI-df; return df<=arc; }
 function doSkill(id,k){
   const p=players[id]; if(!p||p.dead)return;
-  if(k==='b'){ if(p.cd.b>0)return; p.cd.b=Math.max(0.15,p.basicCd-(p.AGI||0)*0.01); doBasic(p,id); return; }
+  if(k==='b'){ if(p.cd.b>0)return; let bcd=Math.max(0.15,p.basicCd-(p.AGI||0)*0.01);
+    if(p.cls==='war' && (p.fervor||0)>=80) bcd*=0.75; // Blood Frenzy: đánh nhanh hơn
+    p.cd.b=bcd; doBasic(p,id); return; }
   const sid=p.loadout&&p.loadout[k]; const sk=findSkill(p.cls,sid); if(!sk||!meetsReq(p,sk))return;
   if(p.cd[k]>0 || p.mp<sk.mp)return;
   if(sk.authCost && (p.authority||0)<sk.authCost)return;
@@ -1785,7 +1787,7 @@ function doBasic(p,id){
     if(hit){const a=Math.atan2(hit.ent.y-p.y,hit.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);
       const fd=applyPassiveOnHit(p,id,hit.ent,dmg);
       if(hit.tp==='e')hurtEnemy(hit.ent,fd,id);else hurtPlayer(hit.ent,fd*PVP,id);
-      if(p.cls==='war') p.fervor=Math.min(100,(p.fervor||0)+8);
+      if(p.cls==='war'){ p.fervor=Math.min(100,(p.fervor||0)+8); p.momT=0; }
       if(p.cls==='blade') p.momentum=Math.min(100,(p.momentum||0)+6);
     }
     fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
@@ -1798,6 +1800,51 @@ function doBasic(p,id){
 function execSkill(p,id,sk,rank){
   const mul=rankMul(rank||1);
   if(sk.type==='dash'){ p.x+=p.fx*sk.dist;p.y+=p.fy*sk.dist;clampPos(p);p.iframe=0.4;fxEv('dash',p.x,p.y,p.hue,p.fx,p.fy,0); }
+  else if(sk.type==='predstep'){
+    p.x+=p.fx*sk.dist; p.y+=p.fy*sk.dist; clampPos(p); p.iframe=0.3;
+    fxEv('dash',p.x,p.y,p.hue,p.fx,p.fy,0);
+    const near=nearestHostile(p,id,90);
+    if(near && statusStacks(near.ent,'wound')>0){ p.cd.b=0; }
+  }
+  else if(sk.type==='warcleave'){
+    const dmgInBase=applyPassiveOnHit(p,id,null,(sk.dmgIn+POW(p))*mul);
+    const dmgOutBase=applyPassiveOnHit(p,id,null,(sk.dmgOut+POW(p)*0.6)*mul);
+    const hitOne=(ent,isEnemy)=>{
+      const dx=ent.x-p.x,dy=ent.y-p.y,d=Math.hypot(dx,dy); if(d>sk.rangeOut)return;
+      const ang=Math.atan2(dy,dx),fa=Math.atan2(p.fy,p.fx); let df=Math.abs(ang-fa); if(df>Math.PI)df=2*Math.PI-df; if(df>sk.arc)return;
+      const wounded=statusStacks(ent,'wound')>0;
+      if(d<=sk.rangeIn){ let dm=dmgInBase; if(wounded){dm*=1.25; p.hp=Math.min(p.maxhp,p.hp+8);}
+        if(isEnemy)hurtEnemy(ent,dm,id); else hurtPlayer(ent,dm*PVP,id);
+      } else { let dm=dmgOutBase; if(wounded)dm*=1.25;
+        if(isEnemy)hurtEnemy(ent,dm,id); else hurtPlayer(ent,dm*PVP,id);
+        addStatus(ent,'wound',{stacks:1,dur:6,maxStacks:5});
+      }
+    };
+    for(const eid in enemies){const e=enemies[eid]; if(!e.dead) hitOne(e,true);}
+    for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0) hitOne(o,false);}
+    p.fervor=Math.min(100,(p.fervor||0)+6); p.momT=0;
+    fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
+  }
+  else if(sk.type==='wcounter'){
+    p.counterT=sk.dur; p.counterDmg=(sk.counterDmg+POW(p))*mul;
+    fxEv('ring',p.x,p.y,p.hue,0,0,50);
+  }
+  else if(sk.type==='wexecute'){
+    const hit=nearestHostile(p,id,sk.range);
+    if(hit){
+      const ent=hit.ent;
+      const missingPct = ent.maxhp ? Math.max(0,1-(ent.hp/ent.maxhp)) : 0;
+      const woundStacks = statusStacks(ent,'wound');
+      const tierBonus = (p.fervor||0)>=80?1.4:((p.fervor||0)>=40?1.15:1);
+      const dmg = applyPassiveOnHit(p,id,ent,(sk.baseDmg+POW(p)*0.8)*mul*(1+missingPct*1.5+woundStacks*0.15)*tierBonus);
+      const willKill = ent.hp<=dmg;
+      if(hit.tp==='e') hurtEnemy(ent,dmg,id); else hurtPlayer(ent,dmg*PVP,id);
+      if(willKill){ p.fervor=Math.min(100,(p.fervor||0)+30); p.momT=0;
+        for(const kk of ['q','w','e','r']) if(p.cd[kk]>0) p.cd[kk]=Math.max(0,p.cd[kk]-3); }
+      fxEv('nova',ent.x,ent.y,0,0,0,60);
+    }
+    fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
+  }
   else if(sk.type==='cone'){
     let fbonus=1;
     if(p.cls==='war'){fbonus=1+((p.fervor||0)*0.005); p.fervor=0;}
@@ -2043,7 +2090,7 @@ function POW(p){
   const buff = (p.buffT>0)?(p.buffAtk||0):0;
   const STR=p.STR||0, VIT=p.VIT||0, AGI=p.AGI||0, INT=p.INT||0;
   let statPart;
-  if(p.cls==='war')       statPart = STR*1.20 + AGI*0.15;
+  if(p.cls==='war'){ const m=p.fervor||0; const tierMul=m>=80?1.15:(m>=40?1.07:1); statPart = (STR*1.20 + AGI*0.15)*tierMul; }
   else if(p.cls==='mage') statPart = INT*1.30;
   else if(p.cls==='arc')  statPart = AGI*1.10 + STR*0.20;
   else if(p.cls==='blade')statPart = Math.max(STR,INT)*0.9 + Math.min(STR,INT)*0.4; // tạm thời tới khi làm stance thật (Phase Blade)
@@ -2289,9 +2336,17 @@ function doGuildChat(p,id,text){
 function hurtPlayer(o,dmg,atkPid,atkEnemyObj,noReflect){ if(o.dead||o.iframe>0)return;
   if(!noReflect){ const dodge=Math.min(0.35,(o.AGI||0)*0.0012);
     if(Math.random()<dodge){ hitEv(o.x,o.y-16,'Né!',false); return; } }
+  if(o.cls==='war' && o.counterT>0 && !noReflect){
+    o.counterT=0; o.fervor=Math.min(100,(o.fervor||0)+20); o.momT=0;
+    dmg*=0.2; hitEv(o.x,o.y-26,'Phản đòn!',false);
+    if(atkPid && players[atkPid] && !players[atkPid].dead) hurtPlayer(players[atkPid],o.counterDmg||30,null,null,true);
+    else if(atkEnemyObj && !atkEnemyObj.dead) hurtEnemy(atkEnemyObj,o.counterDmg||30,idOf(o));
+  }
   dmg*=(1-((o.gemBonus&&o.gemBonus.tho)||0)*0.08);
+  if(o.cls==='war' && (o.fervor||0)>=80) dmg*=0.9; // Blood Frenzy: giảm nhẹ sát thương nhận
   if(o.shieldHP>0){ const absorb=Math.min(o.shieldHP,dmg); o.shieldHP-=absorb; dmg-=absorb; if(dmg<=0){hitEv(o.x,o.y-16,0,false);return;} }
-  if(o.cls==='war'){ if(o.ironWillT>0){dmg*=0.8;} else if((o.hp/o.maxhp)<0.3 && (o.passT||0)<=0){ o.ironWillT=3; o.passT=15; dmg*=0.8; } }
+  if(o.cls==='war'){ if(o.ironWillT>0){dmg*=0.8;} else if((o.hp/o.maxhp)<0.3 && (o.passT||0)<=0){ o.ironWillT=3; o.passT=15; dmg*=0.8; }
+    if(o.maxhp && dmg>o.maxhp*0.08){ o.fervor=Math.min(100,(o.fervor||0)+10); o.momT=0; } } // chịu dmg đáng kể → tích Momentum
   const dealt=dmg;
   o.hp-=dmg;o.hurtT=0; hitEv(o.x,o.y-16,dmg,false);
   if(o.hp<=0){
@@ -2328,7 +2383,8 @@ setInterval(()=>{
     if(p.iframe>0)p.iframe-=dt; p.hurtT+=dt; if(p.buffT>0)p.buffT-=dt;
     if(p.passT>0)p.passT-=dt; if(p.ironWillT>0)p.ironWillT-=dt; if(p.spellBladeT>0)p.spellBladeT-=dt;
     if(p.shieldT>0){p.shieldT-=dt; if(p.shieldT<=0)p.shieldHP=0;} if(p.slowT>0)p.slowT-=dt;
-    if(p.cls==='war' && p.fervor>0 && p.hurtT>3){ p.fervor=Math.max(0,p.fervor-6*dt); }
+    if(p.cls==='war'){ p.momT=(p.momT||0)+dt; if(p.fervor>0 && p.momT>3){ p.fervor=Math.max(0,p.fervor-6*dt); }
+      if(p.counterT>0){ p.counterT-=dt; if(p.counterT<0)p.counterT=0; } }
     if(p.cls==='arc' && p.focus>0 && p.hurtT>3){ p.focus=Math.max(0,p.focus-6*dt); }
     if(p.cls==='blade' && p.hurtT>3){ if(p.momentum>0)p.momentum=Math.max(0,p.momentum-5*dt); if(p.arcane>0)p.arcane=Math.max(0,p.arcane-5*dt); }
     p.mp=Math.min(p.maxmp,p.mp+12*dt);
@@ -2411,4 +2467,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.51 (redesign nền tảng: formula+status engine) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.52 (Phase War-A: Q/W/E/R + Momentum) chạy ở cổng '+PORT));
