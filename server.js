@@ -582,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.52 · Phase War-A (Q/W/E/R + Momentum)</div>
+  <div id="ver">v0.53 · Phase War hoàn thiện (11 skill)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1576,6 +1576,8 @@ wss.on('connection',(ws)=>{
     STR:0,VIT:0,AGI:0,INT:0,statPts:0,skillPts:0,skRank:{},loadout:null,
     shieldHP:0,shieldT:0,slowT:0,slowMul:1,
     passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,counterT:0,counterDmg:0,momT:0,
+    warcryDefT:0,warcryDefMul:1,debtT:0,debtAmount:0,debtTargetObj:null,debtIsEnemy:false,debtBankPct:0.3,lastStandT:0,momGenBonus:0,
+    duelT:0,duelTargetObj:null,duelIsEnemy:false,duelElapsed:0,duelGrowth:0.15,duelTickT:0,duelBaseDmg:10,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
     dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,hspet:null,hspetApplied:null,
     gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,summon:null,
@@ -1685,10 +1687,12 @@ const SKILLS = {
     {id:'w2',name:'Chém Rộng',   icon:'🌀',type:'warcleave',mp:16,cd:2.5, unlockLv:3,  rangeIn:75,rangeOut:135,arc:1.05,dmgIn:34,dmgOut:20},
     {id:'w3',name:'Phản Đòn Sắt',icon:'🛡️',type:'wcounter',mp:20,cd:8,   unlockLv:5,  dur:1.0,counterDmg:36},
     {id:'w4',name:'Chém Kết Liễu',icon:'💀',type:'wexecute',mp:35,cd:11, unlockLv:7,  range:110,baseDmg:30},
-    {id:'w5',name:'Khiên Gang', icon:'🛡️',type:'shield',mp:22,cd:9, unlockLv:10, amount:60,dur:5, reqStat:'VIT',reqVal:15},
-    {id:'w6',name:'Hút Sinh Kiếm',icon:'🩸',type:'lifesteal',mp:18,cd:3.5,unlockLv:13,range:100,dmg:30,lsPct:0.6, reqStat:'STR',reqVal:15},
-    {id:'w7',name:'Trảm Cước',  icon:'❄️',type:'slow', mp:26,cd:8,   unlockLv:16, radius:130,dmg:20,slowMul:0.5,slowDur:2.5},
-    {id:'w8',name:'Xung Phong', icon:'⚡',type:'leap',  mp:30,cd:10,  unlockLv:20, dist:220,dmg:50,impactR:100},
+    {id:'w5',name:'Gầm Chiến',  icon:'📢',type:'warcry', mp:26,cd:12, unlockLv:10, radius:170,atkDebuff:0.25,debuffDur:3,defBuff:0.2,buffDur:4, reqStat:'VIT',reqVal:15},
+    {id:'w6',name:'Xuyên Giáp', icon:'🗡️',type:'rupture',mp:20,cd:6,  unlockLv:13, range:105,dmg:32,shredMul:1.5,shredDur:3, reqStat:'STR',reqVal:15},
+    {id:'w7',name:'Nợ Máu',     icon:'📌',type:'blooddebt',mp:24,cd:10,unlockLv:16, range:220,dur:5,bankPct:0.3},
+    {id:'w8',name:'Tử Chiến',   icon:'💢',type:'laststand',mp:30,cd:22,unlockLv:20, dur:4,hpReq:0.3,momGen:3},
+    {id:'w9',name:'Địa Chấn Trường',icon:'🪓',type:'groundbreak',mp:32,cd:10,unlockLv:23,len:180,width:70,dmg:42,slowMul:0.4,slowDur:2},
+    {id:'w10',name:'Phán Quyết Lãnh Chúa',icon:'⚔️',type:'warlordverdict',mp:50,cd:30,unlockLv:26,range:150,dur:5,dmgGrowth:0.15},
   ],
   mage:[
     {id:'m1',name:'Dịch Chuyển',icon:'✨',type:'dash', mp:14,cd:3,   unlockLv:2,  dist:180},
@@ -1765,6 +1769,7 @@ function doSkill(id,k){
   const sid=p.loadout&&p.loadout[k]; const sk=findSkill(p.cls,sid); if(!sk||!meetsReq(p,sk))return;
   if(p.cd[k]>0 || p.mp<sk.mp)return;
   if(sk.authCost && (p.authority||0)<sk.authCost)return;
+  if(sk.hpReq && (p.hp/p.maxhp)>sk.hpReq)return;
   p.mp-=sk.mp; p.cd[k]=Math.max(0.3,sk.cd-(p.INT||0)*0.02); execSkill(p,id,sk,(p.skRank&&p.skRank[sid])||1);
 }
 function rankMul(rank){ return 1+(rank-1)*0.22; } // rank 1..5 → tới +88% dmg
@@ -1844,6 +1849,54 @@ function execSkill(p,id,sk,rank){
       fxEv('nova',ent.x,ent.y,0,0,0,60);
     }
     fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
+  }
+  else if(sk.type==='warcry'){
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead)continue;
+      if(Math.hypot(e.x-p.x,e.y-p.y)<sk.radius){ const amt=sk.atkDebuff*(e.boss?0.5:1); e.atkDebuffT=sk.debuffDur; e.atkDebuffMul=1-amt; } }
+    if(p.party && parties[p.party]){
+      for(const mid of parties[p.party].members){ const o=players[mid]; if(!o||!o.chosen||o.dead)continue;
+        if(Math.hypot(o.x-p.x,o.y-p.y)<sk.radius){ o.warcryDefT=sk.buffDur; o.warcryDefMul=1-sk.defBuff; } }
+    }
+    fxEv('ring',p.x,p.y,p.hue,0,0,sk.radius);
+  }
+  else if(sk.type==='rupture'){
+    const hit=nearestHostile(p,id,sk.range);
+    if(hit){
+      const ent=hit.ent;
+      const dmg=applyPassiveOnHit(p,id,ent,(sk.dmg+POW(p))*mul);
+      if(hit.tp==='p' && ent.shieldHP>0){
+        const absorb=Math.min(ent.shieldHP,dmg*1.5); ent.shieldHP-=absorb;
+        const rem=Math.max(0,dmg-absorb); if(rem>0)hurtPlayer(ent,rem*PVP,id);
+      } else {
+        addStatus(ent,'shred',{dur:sk.shredDur,data:{mul:sk.shredMul}});
+        if(hit.tp==='e')hurtEnemy(ent,dmg,id); else hurtPlayer(ent,dmg*PVP,id);
+      }
+    }
+    fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
+  }
+  else if(sk.type==='blooddebt'){
+    const hit=nearestHostile(p,id,sk.range);
+    if(hit){ p.debtTargetObj=hit.ent; p.debtIsEnemy=(hit.tp==='e'); p.debtAmount=0; p.debtT=sk.dur; p.debtBankPct=sk.bankPct;
+      fxEv('ring',hit.ent.x,hit.ent.y,p.hue,0,0,40); }
+  }
+  else if(sk.type==='laststand'){
+    p.lastStandT=sk.dur; p.momGenBonus=sk.momGen;
+    fxEv('ring',p.x,p.y,48,0,0,60);
+  }
+  else if(sk.type==='groundbreak'){
+    const fa=Math.atan2(p.fy,p.fx);
+    const dmg=applyPassiveOnHit(p,id,null,(sk.dmg+POW(p))*mul);
+    const hitRect=(ent)=>{ const dx=ent.x-p.x,dy=ent.y-p.y;
+      const fwd=dx*Math.cos(fa)+dy*Math.sin(fa), side=-dx*Math.sin(fa)+dy*Math.cos(fa);
+      return fwd>=0 && fwd<=sk.len && Math.abs(side)<=sk.width/2; };
+    for(const eid in enemies){const e=enemies[eid]; if(!e.dead && hitRect(e)){ hurtEnemy(e,dmg,id); e.slowT=sk.slowDur; e.slowMul=sk.slowMul; } }
+    for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0&&hitRect(o)){ hurtPlayer(o,dmg*PVP,id); o.slowT=sk.slowDur; o.slowMul=sk.slowMul; } }
+    fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0); fxEv('dash',p.x+p.fx*sk.len*0.5,p.y+p.fy*sk.len*0.5,p.hue,p.fx,p.fy,0);
+  }
+  else if(sk.type==='warlordverdict'){
+    const hit=nearestHostile(p,id,sk.range);
+    if(hit){ p.duelTargetObj=hit.ent; p.duelIsEnemy=(hit.tp==='e'); p.duelT=sk.dur; p.duelElapsed=0; p.duelGrowth=sk.dmgGrowth; p.duelTickT=0; p.duelBaseDmg=POW(p)*0.3;
+      fxEv('ring',p.x,p.y,0,0,0,sk.range); }
   }
   else if(sk.type==='cone'){
     let fbonus=1;
@@ -1962,7 +2015,8 @@ function aoe(caster,R,dmg,byId,slowMul,slowDur){
   for(const eid in enemies){const e=enemies[eid];if(e.dead||e.zone!==caster.zone)continue;if(Math.hypot(e.x-caster.x,e.y-caster.y)<R){hurtEnemy(e,dmg,byId); if(slowMul){e.slowT=slowDur;e.slowMul=slowMul;}}}
   for(const pid in players){const o=players[pid];if(o===caster||o.dead||o.iframe>0||o.zone!==caster.zone||zoneOf(caster).safe)continue;if(Math.hypot(o.x-caster.x,o.y-caster.y)<R){hurtPlayer(o,dmg*PVP,byId); if(slowMul){o.slowT=slowDur;o.slowMul=slowMul;}}}
 }
-function hurtEnemy(e,dmg,byId){ e.hp-=dmg; e.lastHit=byId; hitEv(e.x,e.y-(e.boss?34:16),dmg,true);
+function hurtEnemy(e,dmg,byId){ const shredS=getStatus(e,'shred'); if(shredS)dmg*=shredS.data.mul||1;
+  e.hp-=dmg; e.lastHit=byId; hitEv(e.x,e.y-(e.boss?34:16),dmg,true);
   if(e.hp<=0){e.dead=true;e.respawnT=e.boss?20:1.6;
     const killer=players[e.lastHit];
     if(killer){ gainXP(killer, e.xp||24);
@@ -2336,6 +2390,7 @@ function doGuildChat(p,id,text){
 function hurtPlayer(o,dmg,atkPid,atkEnemyObj,noReflect){ if(o.dead||o.iframe>0)return;
   if(!noReflect){ const dodge=Math.min(0.35,(o.AGI||0)*0.0012);
     if(Math.random()<dodge){ hitEv(o.x,o.y-16,'Né!',false); return; } }
+  const shredS=getStatus(o,'shred'); if(shredS)dmg*=shredS.data.mul||1;
   if(o.cls==='war' && o.counterT>0 && !noReflect){
     o.counterT=0; o.fervor=Math.min(100,(o.fervor||0)+20); o.momT=0;
     dmg*=0.2; hitEv(o.x,o.y-26,'Phản đòn!',false);
@@ -2343,10 +2398,14 @@ function hurtPlayer(o,dmg,atkPid,atkEnemyObj,noReflect){ if(o.dead||o.iframe>0)r
     else if(atkEnemyObj && !atkEnemyObj.dead) hurtEnemy(atkEnemyObj,o.counterDmg||30,idOf(o));
   }
   dmg*=(1-((o.gemBonus&&o.gemBonus.tho)||0)*0.08);
+  if(o.warcryDefT>0) dmg*=(o.warcryDefMul||1);
   if(o.cls==='war' && (o.fervor||0)>=80) dmg*=0.9; // Blood Frenzy: giảm nhẹ sát thương nhận
   if(o.shieldHP>0){ const absorb=Math.min(o.shieldHP,dmg); o.shieldHP-=absorb; dmg-=absorb; if(dmg<=0){hitEv(o.x,o.y-16,0,false);return;} }
   if(o.cls==='war'){ if(o.ironWillT>0){dmg*=0.8;} else if((o.hp/o.maxhp)<0.3 && (o.passT||0)<=0){ o.ironWillT=3; o.passT=15; dmg*=0.8; }
-    if(o.maxhp && dmg>o.maxhp*0.08){ o.fervor=Math.min(100,(o.fervor||0)+10); o.momT=0; } } // chịu dmg đáng kể → tích Momentum
+    if(o.maxhp && dmg>o.maxhp*0.08){ o.fervor=Math.min(100,(o.fervor||0)+10); o.momT=0; } // chịu dmg đáng kể → tích Momentum
+    if(o.debtT>0 && o.debtTargetObj){ const matches=(atkEnemyObj&&atkEnemyObj===o.debtTargetObj)||(atkPid&&players[atkPid]===o.debtTargetObj);
+      if(matches) o.debtAmount=(o.debtAmount||0)+dmg*(o.debtBankPct||0.3); }
+    if(o.lastStandT>0 && dmg>=o.hp){ dmg=Math.max(0,o.hp-1); } }
   const dealt=dmg;
   o.hp-=dmg;o.hurtT=0; hitEv(o.x,o.y-16,dmg,false);
   if(o.hp<=0){
@@ -2383,8 +2442,26 @@ setInterval(()=>{
     if(p.iframe>0)p.iframe-=dt; p.hurtT+=dt; if(p.buffT>0)p.buffT-=dt;
     if(p.passT>0)p.passT-=dt; if(p.ironWillT>0)p.ironWillT-=dt; if(p.spellBladeT>0)p.spellBladeT-=dt;
     if(p.shieldT>0){p.shieldT-=dt; if(p.shieldT<=0)p.shieldHP=0;} if(p.slowT>0)p.slowT-=dt;
-    if(p.cls==='war'){ p.momT=(p.momT||0)+dt; if(p.fervor>0 && p.momT>3){ p.fervor=Math.max(0,p.fervor-6*dt); }
-      if(p.counterT>0){ p.counterT-=dt; if(p.counterT<0)p.counterT=0; } }
+    if(p.cls==='war'){ p.momT=(p.momT||0)+dt; if(p.fervor>0 && p.momT>3){ p.fervor=Math.max(0,p.fervor-6*dt*(p.momGenBonus?0.5:1)); }
+      if(p.counterT>0){ p.counterT-=dt; if(p.counterT<0)p.counterT=0; }
+      if(p.warcryDefT>0)p.warcryDefT-=dt;
+      if(p.lastStandT>0){ p.lastStandT-=dt; if(p.lastStandT<=0)p.momGenBonus=0; }
+      if(p.debtT>0){ p.debtT-=dt;
+        if(p.debtT<=0){ const tgt=p.debtTargetObj;
+          if(tgt && !tgt.dead && p.debtAmount>0){ if(p.debtIsEnemy)hurtEnemy(tgt,p.debtAmount,id); else hurtPlayer(tgt,p.debtAmount*PVP,id); fxEv('nova',tgt.x,tgt.y,0,0,0,50); }
+          else if(tgt && tgt.dead && p.debtAmount>0){ p.hp=Math.min(p.maxhp,p.hp+p.debtAmount*0.5); }
+          p.debtTargetObj=null; p.debtAmount=0; } }
+      if(p.duelT>0){ p.duelT-=dt; p.duelElapsed=(p.duelElapsed||0)+dt; p.duelTickT=(p.duelTickT||0)-dt;
+        const tgt=p.duelTargetObj;
+        if(!tgt || tgt.dead || (tgt.zone&&tgt.zone!==p.zone)){ p.duelT=0; p.duelTargetObj=null; }
+        else if(p.duelTickT<=0){ p.duelTickT=1.0;
+          const growMul=1+(p.duelElapsed||0)*(p.duelGrowth||0.15);
+          const dmgToTarget=(p.duelBaseDmg||10)*growMul, dmgToSelf=(p.duelBaseDmg||10)*0.5*growMul;
+          if(p.duelIsEnemy)hurtEnemy(tgt,dmgToTarget,id); else hurtPlayer(tgt,dmgToTarget*PVP,id);
+          hurtPlayer(p,dmgToSelf,null,null,true);
+          fxEv('ring',p.x,p.y,0,0,0,40);
+        }
+        if(p.duelT<=0){ p.duelTargetObj=null; } } }
     if(p.cls==='arc' && p.focus>0 && p.hurtT>3){ p.focus=Math.max(0,p.focus-6*dt); }
     if(p.cls==='blade' && p.hurtT>3){ if(p.momentum>0)p.momentum=Math.max(0,p.momentum-5*dt); if(p.arcane>0)p.arcane=Math.max(0,p.arcane-5*dt); }
     p.mp=Math.min(p.maxmp,p.mp+12*dt);
@@ -2417,12 +2494,12 @@ setInterval(()=>{
   for(const eid in enemies){const e=enemies[eid];
     if(e.dead){e.respawnT-=dt;if(e.respawnT<=0){const wasBoss=e.boss,z=e.zone;delete enemies[eid];
       if(wasBoss){ if(z==='dungeon')spawnBoss(z); } else spawnEnemy(z);}continue;}
-    if(e.atk>0)e.atk-=dt; if(e.slowT>0)e.slowT-=dt; tickStatuses(e,dt);
+    if(e.atk>0)e.atk-=dt; if(e.slowT>0)e.slowT-=dt; if(e.atkDebuffT>0)e.atkDebuffT-=dt; tickStatuses(e,dt);
     let tp=null,best=1e9;
     for(const id in players){const p=players[id];if(!p.chosen||p.dead||p.zone!==e.zone)continue;const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<best){best=d;tp=p;}}
     const espd=e.spd*((e.slowT>0)?(e.slowMul||1):1);
     if(tp){ const reach=15+e.r; if(best>reach){const a=Math.atan2(tp.y-e.y,tp.x-e.x);e.x+=Math.cos(a)*espd*dt;e.y+=Math.sin(a)*espd*dt;}
-      else if(e.atk<=0){ const a=Math.atan2(tp.y-e.y,tp.x-e.x); e.x+=Math.cos(a)*12;e.y+=Math.sin(a)*12; hurtPlayer(tp,e.dmg||6,null,e); fxEv('bite',tp.x,tp.y,0,Math.cos(a),Math.sin(a),0); e.atk=e.boss?1.4:1.0; } }
+      else if(e.atk<=0){ const a=Math.atan2(tp.y-e.y,tp.x-e.x); e.x+=Math.cos(a)*12;e.y+=Math.sin(a)*12; hurtPlayer(tp,(e.dmg||6)*((e.atkDebuffT>0)?(e.atkDebuffMul||1):1),null,e); fxEv('bite',tp.x,tp.y,0,Math.cos(a),Math.sin(a),0); e.atk=e.boss?1.4:1.0; } }
   }
   for(let i=bolts.length-1;i>=0;i--){const b=bolts[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
     let hit=false; const zw=(ZONES[b.zone]||ZONES.town).w, zh=(ZONES[b.zone]||ZONES.town).h;
@@ -2467,4 +2544,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.52 (Phase War-A: Q/W/E/R + Momentum) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.53 (Phase War hoàn thiện: 11 skill) chạy ở cổng '+PORT));
