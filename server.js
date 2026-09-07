@@ -582,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.57 · Dấu Ấn nhắm chuẩn xác</div>
+  <div id="ver">v0.58 · hạ tầng Charge (tích lực)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1298,15 +1298,19 @@ function flash(k){var id={b:'sB',q:'sQ',w:'sW',e:'sE',r:'sR'}[k];var el=document
   el.animate([{transform:'translateX(-3px)'},{transform:'translateX(3px)'},{transform:'translateX(0)'}],{duration:140});}
 function bindBtn(id,k){document.getElementById(id).addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();cast(k);});}
 var aimState={active:false,slot:null,dx:0,dy:1,mag:0,ox:0,oy:0};
+var chargeState={active:false,slot:null,startT:0};
 var AIM_MAX_PX=90;
+function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
-  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false;
+  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false;
   btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
     if(cd[k]>0)return;
     startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;
     try{btn.setPointerCapture(ev.pointerId);}catch(e){}
-    holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},160);
+    wasCharge=isChargeable(k);
+    if(wasCharge){ if(ws.readyState===1)ws.send(JSON.stringify({t:'chargestart',k:k})); chargeState.active=true;chargeState.slot=k;chargeState.startT=performance.now(); }
+    holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},wasCharge?0:160);
   });
   btn.addEventListener('pointermove',function(ev){
     if(!holding)return;
@@ -1315,12 +1319,13 @@ function bindSkillBtn(id,k){
   });
   function release(ev){
     clearTimeout(holdTimer);
+    chargeState.active=false;
     if(holding){ holding=false; aimState.active=false;
       if(dragged) cast(k,{dx:aimState.dx,dy:aimState.dy,mag:aimState.mag}); else cast(k);
     } else { cast(k); }
   }
   btn.addEventListener('pointerup',release);
-  btn.addEventListener('pointercancel',function(){clearTimeout(holdTimer);holding=false;aimState.active=false;});
+  btn.addEventListener('pointercancel',function(){clearTimeout(holdTimer);holding=false;aimState.active=false;chargeState.active=false;});
 }
 bindBtn('sB','b');bindSkillBtn('sQ','q');bindSkillBtn('sW','w');bindSkillBtn('sE','e');bindSkillBtn('sR','r');
 
@@ -1583,6 +1588,18 @@ function frame(now){
     ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.stroke();
     ctx.restore();
   }
+  if(chargeState.active){
+    var held=performance.now()-chargeState.startT;
+    var tier=held<200?0:held<700?1:held<1200?2:3;
+    var tierCol=['#8a8a8a','#ffd76b','#ff9a4a','#ff4a4a'][tier];
+    var btnEl=document.getElementById({q:'sQ',w:'sW',e:'sE',r:'sR'}[chargeState.slot]);
+    if(btnEl){ var br2=btnEl.getBoundingClientRect(); var bcx=br2.left+br2.width/2, bcy=br2.top+br2.height/2;
+      var prog=Math.min(1,held/1200);
+      ctx.save();ctx.strokeStyle=tierCol;ctx.lineWidth=4;ctx.globalAlpha=.9;
+      ctx.beginPath();ctx.arc(bcx,bcy,br2.width/2+6,-Math.PI/2,-Math.PI/2+prog*Math.PI*2);ctx.stroke();
+      ctx.restore();
+    }
+  }
 
   requestAnimationFrame(frame);
 }
@@ -1679,6 +1696,7 @@ wss.on('connection',(ws)=>{
     passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,counterT:0,counterDmg:0,momT:0,
     warcryDefT:0,warcryDefMul:1,debtT:0,debtAmount:0,debtTargetObj:null,debtIsEnemy:false,debtBankPct:0.3,lastStandT:0,momGenBonus:0,
     duelT:0,duelTargetObj:null,duelIsEnemy:false,duelElapsed:0,duelGrowth:0.15,duelTickT:0,duelBaseDmg:10,
+    chargeStart:{},chargeMul:1,chargeTier:0,
     huntTargetObj:null,huntStack:0,windguardT:0,windguardArc:0.9,windguardMul:1,windguardFx:0,windguardFy:1,
     wildHuntT:0,wildHuntTargetObj:null,aspdBonusWH:0,rhythmFx:0,rhythmFy:1,rhythmT:0,rhythmReady:false,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
@@ -1725,6 +1743,13 @@ wss.on('connection',(ws)=>{
       p.ix=clamp(m.x); p.iy=clamp(m.y);
       const d=Math.hypot(p.ix,p.iy); if(d>0.2){p.fx=p.ix/d;p.fy=p.iy/d;}
     } else if(m.t==='skill'){ doSkill(id,m.k,m.aim); }
+    else if(m.t==='chargestart'){
+      const p=players[id]; if(!p||p.dead)return;
+      const sid=p.loadout&&p.loadout[m.k]; const sk=findSkill(p.cls,sid);
+      if(!sk||!sk.chargeable)return;
+      if(!p.chargeStart)p.chargeStart={};
+      p.chargeStart[m.k]=Date.now();
+    }
     else if(m.t==='equip'){ doEquip(p,id,m.itemId); }
     else if(m.t==='unequip'){ doUnequip(p,id,m.slot); }
     else if(m.t==='enchant'){ doEnchant(p,id,m.itemId); }
@@ -1810,8 +1835,8 @@ const SKILLS = {
   mage:[
     {id:'m1',name:'Dịch Chuyển',icon:'✨',type:'dash', mp:14,cd:3,   unlockLv:2,  dist:180,
       desc:'Dịch chuyển ngắn tức thời tới vị trí chỉ định.'},
-    {id:'m2',name:'Thương Lửa', icon:'🔥',type:'emberlance', mp:16,cd:1.2, unlockLv:3,  dmg:38,speed:560,r:8,burnDmg:6,burnTicks:3,elem:'fire',scaleKey:'dmg',
-      desc:'Phóng thương lửa đơn mục tiêu, gây Bỏng (dame theo thời gian 3 nhịp). Nếu mục tiêu đang dính Băng (từ Lăng Kính Băng) → Bỏng biến thành nổ bùng ngay lập tức. Đổi hệ từ Băng/Huyền Bí sang Lửa sẽ kích phản ứng Nguyên Tố.'},
+    {id:'m2',name:'Thương Lửa', icon:'🔥',type:'emberlance', mp:16,cd:1.2, unlockLv:3,  dmg:38,speed:560,r:8,burnDmg:6,burnTicks:3,elem:'fire',scaleKey:'dmg',chargeable:true,
+      desc:'GIỮ để tích lực trước khi thả (thả sớm = đòn nhanh yếu, giữ đủ lâu = mạnh hơn hẳn). Gây Bỏng. Nếu mục tiêu đang dính Băng (từ Lăng Kính Băng) → Bỏng biến thành nổ bùng ngay lập tức. Đổi hệ từ Băng/Huyền Bí sang Lửa sẽ kích phản ứng Nguyên Tố.'},
     {id:'m3',name:'Lăng Kính Băng',icon:'🔷',type:'frostprism', mp:22,cd:7,   unlockLv:5,  range:280,radius:110,dur:6,elem:'frost',
       desc:'Đặt 1 lăng kính băng tại vị trí xa — mọi kẻ địch trong vùng bị đánh dấu Băng, các đòn Lửa của bạn đánh trúng chúng sẽ bùng nổ mạnh hơn. Đổi hệ sang Băng kích phản ứng Nguyên Tố.'},
     {id:'m4',name:'Dây Huyền Bí',icon:'🧵',type:'arcanethread', mp:28,cd:8,  unlockLv:7,  len:260,width:36,dmg:30,slowMul:0.5,slowDur:2,manaBurn:15,elem:'arcane',scaleKey:'dmg',
@@ -1834,8 +1859,8 @@ const SKILLS = {
       desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đánh dấu (nhả tay sẽ nhắm đúng kẻ gần điểm ngắm nhất — nhắm hụt sẽ không trúng ai!). Bấm nhanh không kéo = tự nhắm gần nhất cho tiện. Đánh dấu 6s — MỌI đòn đánh của bạn lên nó +25% sát thương.'},
     {id:'a4',name:'Bẫy Rừng Xanh',icon:'🕸️',type:'trap',   mp:20,cd:9, unlockLv:7, range:120,triggerR:26,rootDur:1.8,life:14,
       desc:'Đặt 1 bẫy vô hình phía trước (tồn tại 14s). Kẻ địch đầu tiên bước vào bị Trói cứng 1.8s + tự động dính Dấu Ấn Thợ Săn.'},
-    {id:'a5',name:'Tên Sao Rơi', icon:'🌠',type:'starfall',mp:30,cd:11, unlockLv:10,range:480,dmg:46,stunDur:1.0,scaleKey:'dmg',
-      desc:'Bắn 1 mũi tên tầm siêu xa — trúng thì gây sát thương lớn + Choáng 1s + gắn Dấu Ấn Thợ Săn. Tầm bắn xa nhất trong bộ kỹ năng.'},
+    {id:'a5',name:'Tên Sao Rơi', icon:'🌠',type:'starfall',mp:30,cd:11, unlockLv:10,range:480,dmg:46,stunDur:1.0,scaleKey:'dmg',chargeable:true,
+      desc:'GIỮ để kéo căng cung trước khi bắn — giữ càng lâu, tầm bắn + sát thương càng tăng (như cung thật). Bắn vội = yếu và gần. Trúng thì gây sát thương + Choáng 1s + gắn Dấu Ấn Thợ Săn.'},
     {id:'a6',name:'Hồi Phục Thần Linh',icon:'💚',type:'spiritheal',mp:32,cd:9,unlockLv:13,range:260,heal:50,castTime:0.8, reqStat:'INT',reqVal:12,scaleKey:'heal',
       desc:'Hồi máu cho đồng minh gần nhất trong tầm (hoặc tự hồi nếu không có ai) — hồi CÀNG NHIỀU nếu mục tiêu càng ít máu. Nhánh Hộ Vệ (cần Trí Tuệ).'},
     {id:'a7',name:'Phù Hộ Hộ Vệ',icon:'🌿',type:'allybuff',mp:26,cd:12,unlockLv:16,dur:5,radius:170,defBuff:0.2, reqStat:'INT',reqVal:15,
@@ -1890,7 +1915,7 @@ function meetsReq(p,s){ return p.lv>=s.unlockLv && (!s.reqStat || (p[s.reqStat]|
 function fullSkillList(p){
   return (SKILLS[p.cls]||[]).map(s=>({id:s.id,name:s.name,icon:s.icon,mp:s.mp,cd:s.cd,unlockLv:s.unlockLv,
     reqStat:s.reqStat||null,reqVal:s.reqVal||0,desc:s.desc||'',scaleKey:s.scaleKey||null,type:s.type,
-    range:s.range||s.dist||0,radius:s.radius||s.triggerR||0,len:s.len||0,width:s.width||0,arc:s.arc||0,
+    range:s.range||s.dist||0,radius:s.radius||s.triggerR||0,len:s.len||0,width:s.width||0,arc:s.arc||0,chargeable:!!s.chargeable,
     unlocked:meetsReq(p,s), rank:(p.skRank&&p.skRank[s.id])||1}));
 }
 function inCone(p,t,range,arc){ const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy); if(d>range)return false;
@@ -1910,6 +1935,13 @@ function doSkill(id,k,aim){
     if(d>0.1){ p.fx=aim.dx/d; p.fy=aim.dy/d; p.aimMag=Math.max(0.25,Math.min(1,aim.mag!==undefined?aim.mag:1)); p.wasAimed=true; }
     else { p.aimMag=1; p.wasAimed=false; }
   } else { p.aimMag=1; p.wasAimed=false; }
+  if(sk.chargeable){
+    const startT=(p.chargeStart&&p.chargeStart[k])||null;
+    const heldMs=startT?Math.min(1500,Math.max(0,Date.now()-startT)):0; // server tự đo, KHÔNG nhận thời gian giữ từ client
+    p.chargeMul = heldMs<200?0.6 : heldMs<700?1.0 : heldMs<1200?1.35 : 1.7;
+    p.chargeTier = heldMs<200?0 : heldMs<700?1 : heldMs<1200?2 : 3;
+    if(p.chargeStart)p.chargeStart[k]=null;
+  } else { p.chargeMul=1; p.chargeTier=0; }
   p.mp-=sk.mp; p.cd[k]=Math.max(0.3,sk.cd-(p.INT||0)*0.02); execSkill(p,id,sk,(p.skRank&&p.skRank[sid])||1);
 }
 function rankMul(rank){ return 1+(rank-1)*0.22; } // rank 1..5 → tới +88% dmg
@@ -2073,13 +2105,14 @@ function execSkill(p,id,sk,rank){
     fxEv('ring',tx,ty,90,0,0,sk.triggerR);
   }
   else if(sk.type==='starfall'){
-    const hit=nearestHostile(p,id,sk.range);
+    const rangeMul=[0.4,0.65,0.85,1.0][p.chargeTier||0];
+    const hit=nearestHostile(p,id,sk.range*rangeMul);
     if(hit){ const ent=hit.ent;
-      const dmg=applyPassiveOnHit(p,id,ent,(sk.dmg+POW(p))*mul*markBonus(ent));
+      const dmg=applyPassiveOnHit(p,id,ent,(sk.dmg+POW(p))*mul*markBonus(ent)*(p.chargeMul||1));
       if(hit.tp==='e')hurtEnemy(ent,dmg,id); else hurtPlayer(ent,dmg*PVP,id);
-      ent.slowT=sk.stunDur; ent.slowMul=0.03;
+      ent.slowT=sk.stunDur*(0.6+0.4*(p.chargeMul||1)); ent.slowMul=0.03;
       addStatus(ent,'huntmark',{dur:4,data:{bonus:0.2}});
-      fxEv('nova',ent.x,ent.y,120,0,0,55);
+      fxEv('nova',ent.x,ent.y,120,0,0,40+15*(p.chargeTier||0));
     }
     fxEv('swing',p.x,p.y,p.hue,p.fx,p.fy,0);
   }
@@ -2124,8 +2157,9 @@ function execSkill(p,id,sk,rank){
     let a; const hit=nearestHostile(p,id,500);
     if(hit){a=Math.atan2(hit.ent.y-p.y,hit.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);} else a=Math.atan2(p.fy,p.fx);
     const reactBonus=mageReaction(p,sk);
-    const dmg=applyPassiveOnHit(p,id,null,(sk.dmg+POW(p))*mul*reactBonus);
-    bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*sk.speed,vy:Math.sin(a)*sk.speed,life:1.0,dmg,curDmg:dmg,owner:id,hue:20,kind:'bolt',r:sk.r,isFire:true,burnDmg:sk.burnDmg});
+    const chM=p.chargeMul||1;
+    const dmg=applyPassiveOnHit(p,id,null,(sk.dmg+POW(p))*mul*reactBonus*chM);
+    bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*sk.speed,vy:Math.sin(a)*sk.speed,life:1.0,dmg,curDmg:dmg,owner:id,hue:20,kind:'bolt',r:sk.r*(0.8+0.3*chM),isFire:true,burnDmg:sk.burnDmg*chM});
     fxEv('swing',p.x,p.y,20,p.fx,p.fy,0);
   }
   else if(sk.type==='frostprism'){
@@ -2853,4 +2887,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.57 (Dấu Ấn nhắm chuẩn xác) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.58 (hạ tầng Charge tích lực) chạy ở cổng '+PORT));
