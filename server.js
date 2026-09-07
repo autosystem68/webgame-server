@@ -582,7 +582,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.55 · Phase Mage-A + slow/root fix + skill desc</div>
+  <div id="ver">v0.56 · preview vùng ảnh hưởng thật</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1536,6 +1536,32 @@ function frame(now){
     ctx.fillText(dn.val,dn.x,dn.y);}
   ctx.globalAlpha=1;
 
+  if(aimState.active && meNow){
+    var aimSk=null; var aimSid=myLoadout&&myLoadout[aimState.slot];
+    for(var asi=0;asi<myFull.length;asi++){ if(myFull[asi].id===aimSid){ aimSk=myFull[asi]; break; } }
+    if(aimSk){
+      var apx=(myPX!==null?myPX:meNow.x), apy=(myPY!==null?myPY:meNow.y);
+      var maxR=aimSk.range||160, curR=maxR*aimState.mag;
+      var tx2=apx+aimState.dx*curR, ty2=apy+aimState.dy*curR;
+      ctx.save();ctx.globalAlpha=0.55;ctx.strokeStyle='#ffb060';ctx.fillStyle='#ffb06030';ctx.lineWidth=2;
+      if(aimSk.type==='trap'||aimSk.type==='frostprism'){
+        ctx.beginPath();ctx.arc(tx2,ty2,aimSk.radius||60,0,7);ctx.fill();ctx.stroke();
+        ctx.beginPath();ctx.moveTo(apx,apy);ctx.lineTo(tx2,ty2);ctx.setLineDash([5,5]);ctx.stroke();ctx.setLineDash([]);
+      } else if(aimSk.arc && aimSk.arc>0.3 && !aimSk.len){
+        var fa2=Math.atan2(aimState.dy,aimState.dx);
+        ctx.beginPath();ctx.moveTo(apx,apy);ctx.arc(apx,apy,maxR,fa2-aimSk.arc,fa2+aimSk.arc);ctx.closePath();ctx.fill();ctx.stroke();
+      } else if(aimSk.len && aimSk.width){
+        var fa3=Math.atan2(aimState.dy,aimState.dx);
+        ctx.save();ctx.translate(apx,apy);ctx.rotate(fa3);
+        ctx.fillRect(0,-aimSk.width/2,aimSk.len,aimSk.width);ctx.strokeRect(0,-aimSk.width/2,aimSk.len,aimSk.width);
+        ctx.restore();
+      } else {
+        ctx.beginPath();ctx.moveTo(apx,apy);ctx.lineTo(apx+aimState.dx*maxR,apy+aimState.dy*maxR);ctx.lineWidth=4;ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   ctx.restore(); // hết camera-space
 
   ctx.restore();
@@ -1546,10 +1572,8 @@ function frame(now){
 
   if(aimState.active){
     var ex=aimState.ox+aimState.dx*aimState.mag*AIM_MAX_PX, ey=aimState.oy+aimState.dy*aimState.mag*AIM_MAX_PX;
-    ctx.save();ctx.globalAlpha=.8;ctx.strokeStyle='#ff9a4a';ctx.lineWidth=3;ctx.setLineDash([6,5]);
-    ctx.beginPath();ctx.moveTo(aimState.ox,aimState.oy);ctx.lineTo(ex,ey);ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='#ff9a4a';ctx.beginPath();ctx.arc(ex,ey,10+aimState.mag*8,0,7);ctx.fill();
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,10+aimState.mag*8,0,7);ctx.stroke();
+    ctx.save();ctx.globalAlpha=.85;ctx.fillStyle='#ff9a4a';ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.stroke();
     ctx.restore();
   }
 
@@ -1858,7 +1882,8 @@ function skillMeta(p){
 function meetsReq(p,s){ return p.lv>=s.unlockLv && (!s.reqStat || (p[s.reqStat]||0)>=s.reqVal); }
 function fullSkillList(p){
   return (SKILLS[p.cls]||[]).map(s=>({id:s.id,name:s.name,icon:s.icon,mp:s.mp,cd:s.cd,unlockLv:s.unlockLv,
-    reqStat:s.reqStat||null,reqVal:s.reqVal||0,desc:s.desc||'',scaleKey:s.scaleKey||null,
+    reqStat:s.reqStat||null,reqVal:s.reqVal||0,desc:s.desc||'',scaleKey:s.scaleKey||null,type:s.type,
+    range:s.range||s.dist||0,radius:s.radius||s.triggerR||0,len:s.len||0,width:s.width||0,arc:s.arc||0,
     unlocked:meetsReq(p,s), rank:(p.skRank&&p.skRank[s.id])||1}));
 }
 function inCone(p,t,range,arc){ const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy); if(d>range)return false;
@@ -2812,4 +2837,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.55 (Phase Mage-A + slow/root fix + skill desc) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.56 (preview vùng ảnh hưởng thật) chạy ở cổng '+PORT));
