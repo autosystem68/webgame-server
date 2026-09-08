@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.61 · hạ tầng Combo/Recast (Chém Rộng 2 nhịp)</div>
+  <div id="ver">v0.62 · Cuồng Phong Trảm (combo Riven-style)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1237,9 +1237,10 @@ ws.onmessage=function(e){
     dmgs.push({x:m.x,y:m.y-40,val:'Lv '+m.lv+'!',life:1.1,max:1.1,foe:true,big:true}); shake=Math.max(shake,8); }
   else if(m.t==='gold'){ var t='+'+m.val+'🪙'+(m.st?(' +'+m.st+'🔨'):''); dmgs.push({x:m.x,y:m.y,val:t,life:0.9,max:0.9,gold:true}); }
   else if(m.t==='combo'){ comboPrompt.active=m.active; comboPrompt.slot=m.slot; comboPrompt.until=performance.now()+(m.windowMs||600); }
-  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:0.4);
+  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:0.4));
     fx.push({kind:m.kind,x:m.x,y:m.y,fx:m.fx,fy:m.fy,hue:m.hue,R:m.R||60,life:lf,max:lf});
-    if(m.kind==='ring')shake=Math.max(shake,14); if(m.kind==='nova')shake=Math.max(shake,7); }
+    if(m.kind==='ring')shake=Math.max(shake,14); if(m.kind==='nova')shake=Math.max(shake,7);
+    if(m.kind==='bigswing')shake=Math.max(shake,m.hue===12?16:8); }
   else if(m.t==='hit'){ dmgs.push({x:m.x,y:m.y,val:m.val,life:0.7,max:0.7,foe:m.foe}); if(!m.foe)shake=Math.max(shake,5);}
 };
 function setBar(bi,ti,v,mx){var el=document.getElementById(bi);if(el){el.style.width=Math.max(0,v/mx*100)+'%';document.getElementById(ti).textContent=Math.ceil(Math.max(0,v))+'/'+mx;}}
@@ -1452,6 +1453,15 @@ function frame(now){
     }
     else if(f.kind==='swing'){ctx.strokeStyle='#ffd9a0';ctx.lineWidth=5;var a=Math.atan2(f.fy,f.fx);
       ctx.beginPath();ctx.arc(f.x,f.y,26,a-0.9,a+0.9);ctx.stroke();}
+    else if(f.kind==='bigswing'){
+      var bsa=Math.atan2(f.fy,f.fx), bsR=(f.R||140)*(0.6+0.4*t);
+      ctx.fillStyle='hsl('+f.hue+',85%,60%)'; ctx.globalAlpha=(f.life/f.max)*0.5;
+      ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.arc(f.x,f.y,bsR,bsa-1.15,bsa+1.15);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='hsl('+f.hue+',95%,72%)'; ctx.lineWidth=6; ctx.globalAlpha=(f.life/f.max);
+      ctx.beginPath();ctx.arc(f.x,f.y,bsR,bsa-1.15,bsa+1.15);ctx.stroke();
+      ctx.lineWidth=3; ctx.globalAlpha=(f.life/f.max)*0.6;
+      ctx.beginPath();ctx.arc(f.x,f.y,bsR*0.75,bsa-0.9,bsa+0.9);ctx.stroke();
+    }
     else if(f.kind==='dash'){ctx.fillStyle='hsl('+f.hue+',70%,60%)';
       for(var d2=0;d2<5;d2++){ctx.beginPath();ctx.arc(f.x-f.fx*d2*10,f.y-f.fy*d2*10,6-d2,0,7);ctx.fill();}}
     else if(f.kind==='bite'){ctx.strokeStyle='#ff5a4a';ctx.lineWidth=3;var ba=Math.atan2(f.fy,f.fx);
@@ -1838,8 +1848,8 @@ const SKILLS = {
   war: [
     {id:'w1',name:'Bước Săn Mồi',icon:'👣',type:'predstep',mp:12,cd:5,   unlockLv:2,  dist:150,
       desc:'Lao ngắn về hướng chỉ định. Nếu tới gần mục tiêu đang dính Wound (Chảy Máu), reset ngay hồi chiêu đánh thường.'},
-    {id:'w2',name:'Chém Rộng',   icon:'🌀',type:'warcleave',mp:16,cd:2.5, unlockLv:3,  rangeIn:75,rangeOut:135,arc:1.05,dmgIn:34,dmgOut:20,scaleKey:'dmgIn',comboNext:true,comboWindow:700,
-      desc:'Nhịp 1: chém vào — vùng GẦN dame cao, vùng XA dame thấp hơn nhưng gây Wound. Trong 0.7s có thể BẤM LẠI để tung Nhịp 2 (chém ra theo hướng ngược lại, quét rộng hơn, dame Wound tăng mạnh hơn) — không tốn thêm mana/hồi chiêu, chỉ cần bấm đúng lúc.'},
+    {id:'w2',name:'Cuồng Phong Trảm',icon:'🌀',type:'warcleave',mp:16,cd:2.5, unlockLv:3,  rangeIn:75,rangeOut:135,arc:1.05,dmgIn:34,dmgOut:20,scaleKey:'dmgIn',comboNext:true,comboWindow:2000,dashDist:110,
+      desc:'Nhịp 1: chém vào — vùng GẦN dame cao, vùng XA dame thấp hơn nhưng gây Wound. Trong 2s có thể BẤM LẠI để LAO TỚI theo hướng đang ngắm rồi chém ngược ra (như Riven) — quét rộng hơn, dame Wound tăng mạnh, không tốn thêm mana/hồi chiêu.'},
     {id:'w3',name:'Phản Đòn Sắt',icon:'🛡️',type:'wcounter',mp:20,cd:8,   unlockLv:5,  dur:1.0,counterDmg:36,scaleKey:'counterDmg',
       desc:'Vào thế thủ 1 giây. Bị đánh trúng trong lúc này: giảm 80% sát thương nhận + phản ngược 1 đòn mạnh + tích lớn Chiến Ý (Momentum). Không bị đánh thì kết thúc không có gì.'},
     {id:'w4',name:'Chém Kết Liễu',icon:'💀',type:'wexecute',mp:35,cd:11, unlockLv:7,  range:110,baseDmg:30,scaleKey:'baseDmg',
@@ -2030,6 +2040,10 @@ function execSkill(p,id,sk,rank,step){
   }
   else if(sk.type==='warcleave'){
     const isStep2=(step===2);
+    if(isStep2){
+      p.x+=p.fx*(sk.dashDist||110); p.y+=p.fy*(sk.dashDist||110); clampPos(p); p.iframe=Math.max(p.iframe||0,0.25);
+      fxEv('dash',p.x,p.y,15,p.fx,p.fy,0);
+    }
     const facingA=isStep2?Math.atan2(-p.fy,-p.fx):Math.atan2(p.fy,p.fx);
     const arcUse=isStep2?sk.arc*1.3:sk.arc;
     const dmgMul2=isStep2?1.3:1;
@@ -2049,7 +2063,7 @@ function execSkill(p,id,sk,rank,step){
     for(const eid in enemies){const e=enemies[eid]; if(!e.dead) hitOne(e,true);}
     for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0) hitOne(o,false);}
     p.fervor=Math.min(100,(p.fervor||0)+(isStep2?10:6)); p.momT=0;
-    fxEv('swing',p.x,p.y,isStep2?15:p.hue,isStep2?-p.fx:p.fx,isStep2?-p.fy:p.fy,0);
+    fxEv('bigswing',p.x,p.y,isStep2?12:35,isStep2?-p.fx:p.fx,isStep2?-p.fy:p.fy,isStep2?170:130);
   }
   else if(sk.type==='wcounter'){
     p.counterT=sk.dur; p.counterDmg=(sk.counterDmg+POW(p))*mul;
@@ -2931,4 +2945,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.61 (hạ tầng Combo/Recast: Chém Rộng 2 nhịp) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.62 (Cuồng Phong Trảm: combo Riven-style) chạy ở cổng '+PORT));
