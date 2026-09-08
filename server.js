@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.68 · fix lag Vực Hút + Phong Ấn nhắm chuẩn</div>
+  <div id="ver">v0.69 · hồng tâm chuẩn xác + fix party + AOE Vọng TG</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1629,9 +1629,14 @@ function frame(now){
       }
       if(aimSk.type==='huntmark'||aimSk.type==='arcanedet'){
         var hax=apx+aimState.dx*maxR*aimState.mag, hay=apy+aimState.dy*maxR*aimState.mag;
-        var bestD=60,bestX=0,bestY=0,bestR=15,found=false;
+        var snapR=(aimSk.type==='arcanedet')?32:60;
+        var bestD=snapR,bestX=0,bestY=0,bestR=15,found=false;
         for(var heid in enemies){var he=enemies[heid]; if(he.dead||he.zone!==myZone)continue; var hd=Math.hypot(he.x-hax,he.y-hay); if(hd<bestD){bestD=hd;bestX=he.x;bestY=he.y;bestR=(he.r||14)+6;found=true;}}
         for(var hpid in players){ if(hpid==myId)continue; var ho=players[hpid]; if(!ho.chosen||ho.dead||ho.zone!==myZone)continue; var hd2=Math.hypot(ho.x-hax,ho.y-hay); if(hd2<bestD){bestD=hd2;bestX=ho.x;bestY=ho.y;bestR=21;found=true;}}
+        ctx.save();ctx.globalAlpha=0.85;ctx.strokeStyle=found?'#ffe070':'#ff5a5a';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(hax-10,hay);ctx.lineTo(hax+10,hay);ctx.moveTo(hax,hay-10);ctx.lineTo(hax,hay+10);ctx.stroke();
+        ctx.beginPath();ctx.arc(hax,hay,6,0,7);ctx.stroke();
+        ctx.restore();
         if(found){ ctx.save();ctx.globalAlpha=0.9;ctx.strokeStyle='#ffe070';ctx.lineWidth=3;ctx.beginPath();ctx.arc(bestX,bestY,bestR,0,7);ctx.stroke();ctx.restore(); }
       }
       ctx.restore();
@@ -1935,8 +1940,8 @@ const SKILLS = {
       desc:'Tạo khiên chắn hấp thụ sát thương trong 5s. Nhánh Sinh Tồn (cần Sinh Lực).'},
     {id:'m8',name:'Hút Hồn',    icon:'💜',type:'lifesteal',mp:20,cd:4,unlockLv:20,range:380,dmg:34,lsPct:0.55, reqStat:'INT',reqVal:20,scaleKey:'dmg',
       desc:'Đòn phép tầm xa, hồi máu bằng 55% sát thương gây ra. Nhánh Hút Máu (cần Trí Tuệ cao).'},
-    {id:'m9',name:'Vọng Thời Gian',icon:'⏳',type:'timeecho', mp:18,cd:16,  unlockLv:23, dur:5,comboNext:true,comboMaxStep:2,comboWindow:5000,maxDist:500,
-      desc:'Lần 1: ghi lại vị trí hiện tại (còn hiệu lực 5s, tự cast tại chỗ — không cần ngắm hướng gì cả). Bấm lại trong 5s đó (miễn còn cách chỗ ghi tối đa 500): DỊCH CHUYỂN NGAY VỀ đúng vị trí đã ghi (không hồi máu, chỉ đổi vị trí).'},
+    {id:'m9',name:'Vọng Thời Gian',icon:'⏳',type:'timeecho', mp:18,cd:16,  unlockLv:23, dur:5,comboNext:true,comboMaxStep:2,comboWindow:5000,maxDist:500,aoeDmg:22,aoeR:70,scaleKey:'aoeDmg',
+      desc:'Lần 1: ghi lại vị trí hiện tại (tự cast tại chỗ, không cần ngắm). Bấm lại trong 5s (còn cách chỗ ghi tối đa 500): DỊCH CHUYỂN NGAY VỀ đúng vị trí đã ghi + gây 1 đợt sát thương nhỏ quanh mình lúc xuất hiện (dư chấn thời gian).'},
     {id:'m10',name:'Vực Hút Trọng Lực',icon:'🌀',type:'gravitywell', mp:30,cd:12, unlockLv:26, range:300,radius:130,life:2.5,pullSpd:40,dmg:8,
       desc:'Tạo 1 vùng hút tại vị trí ngắm, tồn tại 2.5s — kẻ địch trong vùng bị kéo dần vào tâm + chịu sát thương nhỏ liên tục. Không mạnh nhưng GOM địch lại để tận dụng Tia Diệt Vong/Dây Huyền Bí ngay sau đó.'},
     {id:'m11',name:'Phong Ấn Huyền Bí',icon:'🔮',type:'arcanedet', mp:20,cd:8, unlockLv:29, range:400,dur:6,bonusPct:0.5,
@@ -2324,8 +2329,13 @@ function execSkill(p,id,sk,rank,step){
   else if(sk.type==='timeecho'){
     if(step===2 && p.echoPos){
       const dist=Math.hypot(p.x-p.echoPos.x,p.y-p.echoPos.y);
-      if(dist<=(sk.maxDist||500)){ p.x=p.echoPos.x; p.y=p.echoPos.y; clampPos(p); fxEv('dash',p.x,p.y,280,0,0,0); }
-      else { fxEv('ring',p.x,p.y,0,0,0,20); } // quá xa điểm ghi — không quay được, chỉ báo hụt
+      if(dist<=(sk.maxDist||500)){
+        p.x=p.echoPos.x; p.y=p.echoPos.y; clampPos(p);
+        const dmg=applyPassiveOnHit(p,id,null,(sk.aoeDmg+POW(p))*mul);
+        for(const eid in enemies){const e=enemies[eid]; if(!e.dead && e.zone===p.zone && Math.hypot(e.x-p.x,e.y-p.y)<=(sk.aoeR||70)) hurtEnemy(e,dmg,id);}
+        for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0&&o.zone===p.zone&&!zoneOf(o).safe&&Math.hypot(o.x-p.x,o.y-p.y)<=(sk.aoeR||70)) hurtPlayer(o,dmg*PVP,id); }
+        fxEv('nova',p.x,p.y,280,0,0,sk.aoeR||70);
+      } else { fxEv('ring',p.x,p.y,0,0,0,20); } // quá xa điểm ghi — không quay được, chỉ báo hụt
       p.echoPos=null;
     } else {
       p.echoPos={x:p.x,y:p.y};
@@ -2342,7 +2352,7 @@ function execSkill(p,id,sk,rank,step){
     let hit=null;
     if(p.wasAimed){
       const ax=p.x+p.fx*sk.range*p.aimMag, ay=p.y+p.fy*sk.range*p.aimMag;
-      let best=60,bestEnt=null,bestTp=null;
+      let best=32,bestEnt=null,bestTp=null;
       for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ax,e.y-ay); if(d<best){best=d;bestEnt=e;bestTp='e';}}
       for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
       if(bestEnt) hit={ent:bestEnt,tp:bestTp};
@@ -3045,18 +3055,22 @@ setInterval(()=>{
       if(Math.hypot(o.x-cr.x,o.y-cr.y)<cr.radius) addStatus(o,'frostmark',{dur:0.5}); }
     if(cr.life<=0) crystals.splice(i,1);
   }
-  for(let i=wells.length-1;i>=0;i--){const w=wells[i]; w.life-=dt; w.tickT-=dt;
+  for(let i=wells.length-1;i>=0;i--){const w=wells[i]; w.life-=dt; w.tickT-=dt; w.pullTickT=(w.pullTickT||0)-dt;
     const doTick=(w.tickT<=0);
+    const doPull=(w.pullTickT<=0);
     if(doTick)w.tickT=0.5;
+    if(doPull)w.pullTickT=0.1;
+    const ownerP=players[w.owner]; const ownerParty=ownerP?ownerP.party:null;
     let tickCount=0;
     for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==w.zone)continue;
       const dx=w.x-e.x,dy=w.y-e.y,d=Math.hypot(dx,dy); if(d>w.radius||d<1)continue;
-      e.x+=(dx/d)*w.pullSpd*dt; e.y+=(dy/d)*w.pullSpd*dt; clampEnemyPos(e);
-      if(doTick && tickCount<4){ hurtEnemy(e,w.dmg,w.owner); tickCount++; } }
+      if(doPull){ e.x+=(dx/d)*w.pullSpd*0.1; e.y+=(dy/d)*w.pullSpd*0.1; clampEnemyPos(e); }
+      if(doTick && tickCount<4){ hurtEnemy(e,w.dmg,w.owner); fxEv('ring',e.x,e.y,280,0,0,20); tickCount++; } }
     for(const pid in players){const o=players[pid]; if(!o.chosen||o.dead||o.zone!==w.zone||zoneOf(o).safe||pid==w.owner)continue;
+      if(ownerParty && o.party===ownerParty)continue; // không hút/gây dame đồng đội cùng tổ đội
       const dx=w.x-o.x,dy=w.y-o.y,d=Math.hypot(dx,dy); if(d>w.radius||d<1)continue;
-      o.x+=(dx/d)*w.pullSpd*dt; o.y+=(dy/d)*w.pullSpd*dt; clampPos(o);
-      if(doTick && tickCount<4){ hurtPlayer(o,w.dmg*PVP,w.owner); tickCount++; } }
+      if(doPull){ o.x+=(dx/d)*w.pullSpd*0.1; o.y+=(dy/d)*w.pullSpd*0.1; clampPos(o); }
+      if(doTick && tickCount<4){ hurtPlayer(o,w.dmg*PVP,w.owner); fxEv('ring',o.x,o.y,280,0,0,20); tickCount++; } }
     if(w.life<=0) wells.splice(i,1);
   }
   for(let i=illusions.length-1;i>=0;i--){ illusions[i].life-=dt; if(illusions[i].life<=0) illusions.splice(i,1); }
@@ -3101,4 +3115,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.68 (fix lag Vực Hút + Phong Ấn nhắm chuẩn) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.69 (hồng tâm chuẩn xác + fix party + AOE Vọng TG) chạy ở cổng '+PORT));
