@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.67 · sửa 3 lỗi thật + phân loại cast đúng</div>
+  <div id="ver">v0.68 · fix lag Vực Hút + Phong Ấn nhắm chuẩn</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1314,7 +1314,7 @@ var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
 function isChannelable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].channelable; } return false; }
 var AIMABLE_TYPES={dash:1,warcleave:1,predstep:1,groundbreak:1,pierce:1,huntmark:1,trap:1,starfall:1,windguard:1,
-  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,proj:1,cone:1,nova:1,slow:1,leap:1};
+  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,arcanedet:1,proj:1,cone:1,nova:1,slow:1,leap:1};
 function isAimable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!AIMABLE_TYPES[myFull[i].type]; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
@@ -1627,7 +1627,7 @@ function frame(now){
       } else {
         ctx.beginPath();ctx.moveTo(apx,apy);ctx.lineTo(apx+aimState.dx*maxR,apy+aimState.dy*maxR);ctx.lineWidth=4;ctx.stroke();
       }
-      if(aimSk.type==='huntmark'){
+      if(aimSk.type==='huntmark'||aimSk.type==='arcanedet'){
         var hax=apx+aimState.dx*maxR*aimState.mag, hay=apy+aimState.dy*maxR*aimState.mag;
         var bestD=60,bestX=0,bestY=0,bestR=15,found=false;
         for(var heid in enemies){var he=enemies[heid]; if(he.dead||he.zone!==myZone)continue; var hd=Math.hypot(he.x-hax,he.y-hay); if(hd<bestD){bestD=hd;bestX=he.x;bestY=he.y;bestR=(he.r||14)+6;found=true;}}
@@ -1940,7 +1940,7 @@ const SKILLS = {
     {id:'m10',name:'Vực Hút Trọng Lực',icon:'🌀',type:'gravitywell', mp:30,cd:12, unlockLv:26, range:300,radius:130,life:2.5,pullSpd:40,dmg:8,
       desc:'Tạo 1 vùng hút tại vị trí ngắm, tồn tại 2.5s — kẻ địch trong vùng bị kéo dần vào tâm + chịu sát thương nhỏ liên tục. Không mạnh nhưng GOM địch lại để tận dụng Tia Diệt Vong/Dây Huyền Bí ngay sau đó.'},
     {id:'m11',name:'Phong Ấn Huyền Bí',icon:'🔮',type:'arcanedet', mp:20,cd:8, unlockLv:29, range:400,dur:6,bonusPct:0.5,
-      desc:'Đóng dấu 1 mục tiêu, KHÔNG gây sát thương ngay. Đòn phép TIẾP THEO của bạn đánh trúng nó sẽ được +50% sát thương và tiêu luôn dấu — đặt dấu trước rồi tung đòn mạnh sau, đúng tinh thần combo-nguyên-tố.'},
+      desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đóng dấu (nhắm hụt sẽ không trúng ai). Không gây sát thương ngay — đòn phép TIẾP THEO của bạn đánh trúng nó sẽ được +50% sát thương và tiêu luôn dấu. Quan trọng cho PK — chọn đúng mục tiêu, không tự nhắm bừa.'},
     {id:'m12',name:'Chuyển Hệ',  icon:'♻️',type:'elemshift', mp:10,cd:5, unlockLv:32,
       desc:'Chủ động đổi hệ Nguyên Tố hiện tại sang hệ TIẾP THEO trong vòng Lửa→Băng→Huyền Bí→Lửa — dùng để tự tạo phản ứng combo mà không cần đổi skill, tốn ít mana, hồi chiêu ngắn.'},
   ],
@@ -2339,7 +2339,15 @@ function execSkill(p,id,sk,rank,step){
     fxEv('ring',wx,wy,280,0,0,sk.radius);
   }
   else if(sk.type==='arcanedet'){
-    const hit=nearestHostile(p,id,sk.range);
+    let hit=null;
+    if(p.wasAimed){
+      const ax=p.x+p.fx*sk.range*p.aimMag, ay=p.y+p.fy*sk.range*p.aimMag;
+      let best=60,bestEnt=null,bestTp=null;
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ax,e.y-ay); if(d<best){best=d;bestEnt=e;bestTp='e';}}
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
+      if(bestEnt) hit={ent:bestEnt,tp:bestTp};
+      if(!hit) fxEv('ring',ax,ay,0,0,0,20); // ngắm hụt — không đóng dấu ai cả
+    } else hit=nearestHostile(p,id,sk.range);
     if(hit){ addStatus(hit.ent,'arcmark',{dur:sk.dur,data:{bonus:sk.bonusPct}}); fxEv('ring',hit.ent.x,hit.ent.y,280,0,0,30); }
   }
   else if(sk.type==='elemshift'){
@@ -3040,14 +3048,15 @@ setInterval(()=>{
   for(let i=wells.length-1;i>=0;i--){const w=wells[i]; w.life-=dt; w.tickT-=dt;
     const doTick=(w.tickT<=0);
     if(doTick)w.tickT=0.5;
+    let tickCount=0;
     for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==w.zone)continue;
       const dx=w.x-e.x,dy=w.y-e.y,d=Math.hypot(dx,dy); if(d>w.radius||d<1)continue;
       e.x+=(dx/d)*w.pullSpd*dt; e.y+=(dy/d)*w.pullSpd*dt; clampEnemyPos(e);
-      if(doTick) hurtEnemy(e,w.dmg,w.owner); }
+      if(doTick && tickCount<4){ hurtEnemy(e,w.dmg,w.owner); tickCount++; } }
     for(const pid in players){const o=players[pid]; if(!o.chosen||o.dead||o.zone!==w.zone||zoneOf(o).safe||pid==w.owner)continue;
       const dx=w.x-o.x,dy=w.y-o.y,d=Math.hypot(dx,dy); if(d>w.radius||d<1)continue;
       o.x+=(dx/d)*w.pullSpd*dt; o.y+=(dy/d)*w.pullSpd*dt; clampPos(o);
-      if(doTick) hurtPlayer(o,w.dmg*PVP,w.owner); }
+      if(doTick && tickCount<4){ hurtPlayer(o,w.dmg*PVP,w.owner); tickCount++; } }
     if(w.life<=0) wells.splice(i,1);
   }
   for(let i=illusions.length-1;i>=0;i--){ illusions[i].life-=dt; if(illusions[i].life<=0) illusions.splice(i,1); }
@@ -3092,4 +3101,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.67 (sửa 3 lỗi thật + phân loại cast) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.68 (fix lag Vực Hút + Phong Ấn nhắm chuẩn) chạy ở cổng '+PORT));
