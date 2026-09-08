@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.64 · sửa combo đúng Riven + chống treo</div>
+  <div id="ver">v0.65 · Channel/Aim (Tia Diệt Vong) + nhật ký bài học</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1310,31 +1310,36 @@ var chargeState={active:false,slot:null,startT:0};
 var comboPrompt={active:false,slot:null,until:0};
 var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
+function isChannelable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].channelable; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
-  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false;
+  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,lastAimSendT=0;
   btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
     if(cd[k]>0)return;
     startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;
     try{btn.setPointerCapture(ev.pointerId);}catch(e){}
-    wasCharge=isChargeable(k);
+    wasCharge=isChargeable(k); wasChannel=isChannelable(k);
     if(wasCharge){ if(ws.readyState===1)ws.send(JSON.stringify({t:'chargestart',k:k})); chargeState.active=true;chargeState.slot=k;chargeState.startT=performance.now(); }
-    holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},wasCharge?0:160);
+    if(wasChannel){ if(ws.readyState===1)ws.send(JSON.stringify({t:'channelstart',k:k})); }
+    holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},(wasCharge||wasChannel)?0:160);
   });
   btn.addEventListener('pointermove',function(ev){
     if(!holding)return;
     var dx=ev.clientX-startX, dy=ev.clientY-startY, d=Math.hypot(dx,dy);
-    if(d>4){ dragged=true; aimState.dx=dx/d; aimState.dy=dy/d; aimState.mag=Math.min(1,d/AIM_MAX_PX); }
+    if(d>4){ dragged=true; aimState.dx=dx/d; aimState.dy=dy/d; aimState.mag=Math.min(1,d/AIM_MAX_PX);
+      if(wasChannel){ var now=performance.now(); if(now-lastAimSendT>70){ lastAimSendT=now; if(ws.readyState===1)ws.send(JSON.stringify({t:'channelaim',k:k,dx:aimState.dx,dy:aimState.dy})); } }
+    }
   });
   function release(ev){
     clearTimeout(holdTimer);
     chargeState.active=false;
+    if(wasChannel){ holding=false; aimState.active=false; if(ws.readyState===1)ws.send(JSON.stringify({t:'channelend',k:k})); return; }
     if(holding){ holding=false; aimState.active=false;
       if(dragged) cast(k,{dx:aimState.dx,dy:aimState.dy,mag:aimState.mag}); else cast(k);
     } else { cast(k); }
   }
   btn.addEventListener('pointerup',release);
-  btn.addEventListener('pointercancel',function(){clearTimeout(holdTimer);holding=false;aimState.active=false;chargeState.active=false;});
+  btn.addEventListener('pointercancel',function(){clearTimeout(holdTimer);holding=false;aimState.active=false;chargeState.active=false; if(wasChannel && ws.readyState===1)ws.send(JSON.stringify({t:'channelend',k:k}));});
 }
 bindBtn('sB','b');bindSkillBtn('sQ','q');bindSkillBtn('sW','w');bindSkillBtn('sE','e');bindSkillBtn('sR','r');
 
@@ -1736,7 +1741,7 @@ wss.on('connection',(ws)=>{
     passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,counterT:0,counterDmg:0,momT:0,
     warcryDefT:0,warcryDefMul:1,debtT:0,debtAmount:0,debtTargetObj:null,debtIsEnemy:false,debtBankPct:0.3,lastStandT:0,momGenBonus:0,
     duelT:0,duelTargetObj:null,duelIsEnemy:false,duelElapsed:0,duelGrowth:0.15,duelTickT:0,duelBaseDmg:10,
-    chargeStart:{},chargeMul:1,chargeTier:0,comboState:null,
+    chargeStart:{},chargeMul:1,chargeTier:0,comboState:null,channelState:null,
     huntTargetObj:null,huntStack:0,windguardT:0,windguardArc:0.9,windguardMul:1,windguardFx:0,windguardFy:1,
     wildHuntT:0,wildHuntTargetObj:null,aspdBonusWH:0,rhythmFx:0,rhythmFy:1,rhythmT:0,rhythmReady:false,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
@@ -1789,6 +1794,24 @@ wss.on('connection',(ws)=>{
       if(!sk||!sk.chargeable)return;
       if(!p.chargeStart)p.chargeStart={};
       p.chargeStart[m.k]=Date.now();
+    }
+    else if(m.t==='channelstart'){
+      const p=players[id]; if(!p||p.dead)return;
+      const sid=p.loadout&&p.loadout[m.k]; const sk=findSkill(p.cls,sid);
+      if(!sk||!sk.channelable||p.channelState)return;
+      if(p.cd[m.k]>0||p.mp<sk.mp)return;
+      p.mp-=sk.mp;
+      p.channelState={skillId:sid,slot:m.k,elapsed:0,tickT:0,maxDur:sk.channelDur||2.0};
+    }
+    else if(m.t==='channelaim'){
+      const p=players[id]; if(!p||!p.channelState)return;
+      const d=Math.hypot(m.dx||0,m.dy||0); if(d>0.1){ p.fx=m.dx/d; p.fy=m.dy/d; }
+    }
+    else if(m.t==='channelend'){
+      const p=players[id]; if(!p||!p.channelState||p.channelState.slot!==m.k)return;
+      const sk=findSkill(p.cls,p.channelState.skillId);
+      if(sk){ p.cd[m.k]=Math.max(0.3,sk.cd-(p.INT||0)*0.02); sendTo(id,{t:'skillcd',slot:m.k,dur:p.cd[m.k]}); }
+      p.channelState=null;
     }
     else if(m.t==='equip'){ doEquip(p,id,m.itemId); }
     else if(m.t==='unequip'){ doUnequip(p,id,m.slot); }
@@ -1881,8 +1904,8 @@ const SKILLS = {
       desc:'Đặt 1 lăng kính băng tại vị trí xa — mọi kẻ địch trong vùng bị đánh dấu Băng, các đòn Lửa của bạn đánh trúng chúng sẽ bùng nổ mạnh hơn. Đổi hệ sang Băng kích phản ứng Nguyên Tố.'},
     {id:'m4',name:'Dây Huyền Bí',icon:'🧵',type:'arcanethread', mp:28,cd:8,  unlockLv:7,  len:260,width:36,dmg:30,slowMul:0.5,slowDur:2,manaBurn:15,elem:'arcane',scaleKey:'dmg',
       desc:'Tạo 1 đường năng lượng thẳng phía trước — kẻ địch trúng bị sát thương + làm chậm + mất Mana (chỉ người chơi). Đổi hệ sang Huyền Bí kích phản ứng Nguyên Tố.'},
-    {id:'m5',name:'Tia Diệt Vong',icon:'☄️',type:'cataclysm', mp:55,cd:13,  unlockLv:10, len:420,width:50,dmg:95,elem:'arcane',scaleKey:'dmg',
-      desc:'Bắn 1 tia năng lượng dài xuyên thẳng — sát thương cực lớn, tăng thêm nếu mục tiêu vừa trúng phản ứng Nguyên Tố gần đây. Tầm xa và hẹp, cần ngắm chuẩn hướng.'},
+    {id:'m5',name:'Tia Diệt Vong',icon:'☄️',type:'cataclysm', mp:55,cd:13,  unlockLv:10, len:420,width:50,dmg:26,elem:'arcane',scaleKey:'dmg',channelable:true,channelDur:2.0,channelTick:0.2,
+      desc:'GIỮ để bắn tia liên tục (2s) — trong lúc giữ, KÉO để XOAY tia theo hướng mới liên tục, không cần thả ra bắn lại. Mỗi 0.2s gây 1 đợt sát thương dọc tia. Thả sớm = tia ngắn hơn nhưng vẫn tính hồi chiêu đủ. Sát thương tăng nếu mục tiêu vừa trúng phản ứng Nguyên Tố.'},
     {id:'m6',name:'Băng Trói',  icon:'🧊',type:'proj', mp:20,cd:4,   unlockLv:13, count:1,dmg:24,speed:460,r:8,slowMul:0.45,slowDur:2.5,scaleKey:'dmg',
       desc:'Tên băng đơn mục tiêu, làm chậm mạnh mục tiêu trúng đòn.'},
     {id:'m7',name:'Lá Chắn Phép',icon:'🔷',type:'shield',mp:24,cd:10,unlockLv:16, amount:70,dur:5, reqStat:'VIT',reqVal:15,scaleKey:'amount',
@@ -1955,7 +1978,7 @@ function meetsReq(p,s){ return p.lv>=s.unlockLv && (!s.reqStat || (p[s.reqStat]|
 function fullSkillList(p){
   return (SKILLS[p.cls]||[]).map(s=>({id:s.id,name:s.name,icon:s.icon,mp:s.mp,cd:s.cd,unlockLv:s.unlockLv,
     reqStat:s.reqStat||null,reqVal:s.reqVal||0,desc:s.desc||'',scaleKey:s.scaleKey||null,type:s.type,
-    range:s.range||s.dist||0,radius:s.radius||s.triggerR||0,len:s.len||0,width:s.width||0,arc:s.arc||0,chargeable:!!s.chargeable,comboNext:!!s.comboNext,
+    range:s.range||s.dist||0,radius:s.radius||s.triggerR||0,len:s.len||0,width:s.width||0,arc:s.arc||0,chargeable:!!s.chargeable,comboNext:!!s.comboNext,channelable:!!s.channelable,
     unlocked:meetsReq(p,s), rank:(p.skRank&&p.skRank[s.id])||1}));
 }
 function inCone(p,t,range,arc){ const dx=t.x-p.x,dy=t.y-p.y,d=Math.hypot(dx,dy); if(d>range)return false;
@@ -2873,6 +2896,28 @@ setInterval(()=>{
       if(csk){ p.cd[p.comboState.slot]=Math.max(0.3,csk.cd-(p.INT||0)*0.02); sendTo(id,{t:'skillcd',slot:p.comboState.slot,dur:p.cd[p.comboState.slot]}); }
       p.comboState=null;
     }
+    if(p.channelState){
+      const cs=p.channelState; cs.elapsed+=dt; cs.tickT-=dt;
+      if(cs.tickT<=0){
+        cs.tickT=(findSkill(p.cls,cs.skillId)||{}).channelTick||0.2;
+        const csk2=findSkill(p.cls,cs.skillId);
+        if(csk2){
+          const fa=Math.atan2(p.fy,p.fx);
+          const dmg=applyPassiveOnHit(p,id,null,(csk2.dmg+POW(p))*rankMul((p.skRank&&p.skRank[cs.skillId])||1));
+          const hitRectC=(ent)=>{ const dx=ent.x-p.x,dy=ent.y-p.y;
+            const fwd=dx*Math.cos(fa)+dy*Math.sin(fa), side=-dx*Math.sin(fa)+dy*Math.cos(fa);
+            return fwd>=0 && fwd<=csk2.len && Math.abs(side)<=csk2.width/2; };
+          for(const eid in enemies){const e=enemies[eid]; if(!e.dead && e.zone===p.zone && hitRectC(e)) hurtEnemy(e,dmg*markBonus(e),id); }
+          for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0&&o.zone===p.zone&&!zoneOf(o).safe&&hitRectC(o)) hurtPlayer(o,dmg*markBonus(o)*PVP,id); }
+          fxEv('ring',p.x+p.fx*csk2.len*0.5,p.y+p.fy*csk2.len*0.5,280,0,0,csk2.width*0.6);
+        }
+      }
+      if(cs.elapsed>=cs.maxDur){
+        const csk3=findSkill(p.cls,cs.skillId);
+        if(csk3){ p.cd[cs.slot]=Math.max(0.3,csk3.cd-(p.INT||0)*0.02); sendTo(id,{t:'skillcd',slot:cs.slot,dur:p.cd[cs.slot]}); }
+        p.channelState=null;
+      }
+    }
     if(p.hspet){ const wasHungry=p.hspet.hunger<=0; p.hspet.hunger=Math.max(0,(p.hspet.hunger||100)-dt*(100/1800));
       if(!wasHungry && p.hspet.hunger<=0){ recompute(p); sendTo(id,{t:'toast',text:'Thú Cưng đói rồi, hiệu quả giảm — cho ăn đi!'}); } }
     else if(p.fusionCd>0){ p.fusionCd=Math.max(0,p.fusionCd-dt); }
@@ -2961,4 +3006,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.64 (sửa combo đúng Riven + chống treo) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.65 (Channel/Aim Tia Diệt Vong) chạy ở cổng '+PORT));
