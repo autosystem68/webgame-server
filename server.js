@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.63 · combo 3 nhịp thật + fix cooldown</div>
+  <div id="ver">v0.64 · sửa combo đúng Riven + chống treo</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1144,6 +1144,7 @@ var ws=new WebSocket(proto+location.host);
 ws.onopen=function(){document.getElementById('st').textContent='Đã vào · joystick trái để đi, phải để đánh';};
 ws.onclose=function(){document.getElementById('st').textContent='Mất kết nối — tải lại trang';};
 ws.onmessage=function(e){
+ try{
   var m=JSON.parse(e.data);
   if(m.t==='welcome'){myId=m.id;document.getElementById('me').textContent='#'+m.id;}
   else if(m.t==='zones'){ ZONEDATA=m.zones||{}; }
@@ -1243,6 +1244,7 @@ ws.onmessage=function(e){
     if(m.kind==='ring')shake=Math.max(shake,14); if(m.kind==='nova')shake=Math.max(shake,7);
     if(m.kind==='bigswing')shake=Math.max(shake,m.hue===5?22:(m.hue===12?16:8)); }
   else if(m.t==='hit'){ dmgs.push({x:m.x,y:m.y,val:m.val,life:0.7,max:0.7,foe:m.foe}); if(!m.foe)shake=Math.max(shake,5);}
+ }catch(e){}
 };
 function setBar(bi,ti,v,mx){var el=document.getElementById(bi);if(el){el.style.width=Math.max(0,v/mx*100)+'%';document.getElementById(ti).textContent=Math.ceil(Math.max(0,v))+'/'+mx;}}
 
@@ -1373,6 +1375,7 @@ setInterval(function(){ if(joy.active && performance.now()-joyStartT>10000) jend
 // ---- render ----
 var last=performance.now();
 function frame(now){
+ try{
   var dt=Math.min(0.05,(now-last)/1000);last=now;
   for(var k in cd)if(cd[k]>0)cd[k]=Math.max(0,cd[k]-dt);
   if(shake>0)shake=Math.max(0,shake-30*dt);
@@ -1635,7 +1638,7 @@ function frame(now){
       ctx.restore();
     }
   }
-
+ }catch(e){}
   requestAnimationFrame(frame);
 }
 function updateBtns(){
@@ -1851,7 +1854,7 @@ const SKILLS = {
     {id:'w1',name:'Bước Săn Mồi',icon:'👣',type:'predstep',mp:12,cd:5,   unlockLv:2,  dist:150,
       desc:'Lao ngắn về hướng chỉ định. Nếu tới gần mục tiêu đang dính Wound (Chảy Máu), reset ngay hồi chiêu đánh thường.'},
     {id:'w2',name:'Cuồng Phong Trảm',icon:'🌀',type:'warcleave',mp:16,cd:2.5, unlockLv:3,  rangeIn:75,rangeOut:135,arc:1.05,dmgIn:34,dmgOut:20,scaleKey:'dmgIn',comboNext:true,comboMaxStep:3,comboWindow:2000,dashDist:110,
-      desc:'CHUỖI 3 ĐÒN (như Riven Q) — mỗi đòn LAO TỚI theo hướng đang ngắm rồi chém, trong 2s sau mỗi đòn có thể bấm tiếp để lên đòn kế (không tốn thêm mana). Đòn 3 là cú xoay chấn động toàn thân, mạnh nhất. Chỉ vào hồi chiêu thật sau khi dứt cả chuỗi (hết 3 đòn hoặc hết giờ không bấm tiếp).'},
+      desc:'CHUỖI 3 ĐÒN (như Riven Q) — mỗi đòn đều LAO TỚI theo hướng đang ngắm (mặc định theo hướng di chuyển, giữ+kéo để tự chọn hướng) rồi chém hình quạt phía trước, trong 2s sau mỗi đòn có thể bấm tiếp để lên đòn kế (không tốn thêm mana). Đòn 3 lao xa hơn + quạt rộng hơn + sát thương mạnh nhất. Chỉ vào hồi chiêu thật sau khi dứt cả chuỗi.'},
     {id:'w3',name:'Phản Đòn Sắt',icon:'🛡️',type:'wcounter',mp:20,cd:8,   unlockLv:5,  dur:1.0,counterDmg:36,scaleKey:'counterDmg',
       desc:'Vào thế thủ 1 giây. Bị đánh trúng trong lúc này: giảm 80% sát thương nhận + phản ngược 1 đòn mạnh + tích lớn Chiến Ý (Momentum). Không bị đánh thì kết thúc không có gì.'},
     {id:'w4',name:'Chém Kết Liễu',icon:'💀',type:'wexecute',mp:35,cd:11, unlockLv:7,  range:110,baseDmg:30,scaleKey:'baseDmg',
@@ -2046,53 +2049,32 @@ function execSkill(p,id,sk,rank,step){
     if(near && statusStacks(near.ent,'wound')>0){ p.cd.b=0; }
   }
   else if(sk.type==='warcleave'){
-    const isStep2=(step===2), isStep3=(step===3);
-    if(step>=1){
-      const dd=(sk.dashDist||110)*(isStep3?1.4:1);
-      p.x+=p.fx*dd; p.y+=p.fy*dd; clampPos(p); p.iframe=Math.max(p.iframe||0,isStep3?0.35:0.25);
-      fxEv('dash',p.x,p.y,isStep3?0:15,p.fx,p.fy,0);
-    }
-    if(isStep3){
-      // Nhịp 3 — xoay chấn động toàn thân, đánh 360 độ quanh mình
-      const dmgMul3=1.8;
-      const dmgBase=applyPassiveOnHit(p,id,null,(sk.dmgIn+POW(p))*mul*dmgMul3);
-      const hit360=(ent,isEnemy)=>{
-        const d=Math.hypot(ent.x-p.x,ent.y-p.y); if(d>sk.rangeOut*1.15)return;
-        const wounded=statusStacks(ent,'wound')>0;
-        let dm=dmgBase; if(wounded){dm*=1.8; p.hp=Math.min(p.maxhp,p.hp+20);}
+    const dashMul=(step===3)?1.3:1;
+    p.x+=p.fx*(sk.dashDist||110)*dashMul; p.y+=p.fy*(sk.dashDist||110)*dashMul; clampPos(p); p.iframe=Math.max(p.iframe||0,0.25);
+    const facingA=Math.atan2(p.fy,p.fx);
+    const arcUse=(step===3)?sk.arc*1.2:sk.arc;
+    const dmgMul=(step===3)?1.6:(step===2?1.3:1);
+    const woundMul=(step===3)?1.7:(step===2?1.5:1.25);
+    const healAmt=(step===3)?18:(step===2?14:8);
+    const woundStacks=(step===3)?3:(step===2?2:1);
+    const dmgInBase=applyPassiveOnHit(p,id,null,(sk.dmgIn+POW(p))*mul*dmgMul);
+    const dmgOutBase=applyPassiveOnHit(p,id,null,(sk.dmgOut+POW(p)*0.6)*mul*dmgMul);
+    const hitOne=(ent,isEnemy)=>{
+      const dx=ent.x-p.x,dy=ent.y-p.y,d=Math.hypot(dx,dy); if(d>sk.rangeOut)return;
+      const ang=Math.atan2(dy,dx); let df=Math.abs(ang-facingA); if(df>Math.PI)df=2*Math.PI-df; if(df>arcUse)return;
+      const wounded=statusStacks(ent,'wound')>0;
+      if(d<=sk.rangeIn){ let dm=dmgInBase; if(wounded){dm*=woundMul; p.hp=Math.min(p.maxhp,p.hp+healAmt);}
         if(isEnemy)hurtEnemy(ent,dm,id); else hurtPlayer(ent,dm*PVP,id);
-        addStatus(ent,'wound',{stacks:3,dur:7,maxStacks:5});
-        const kb=Math.atan2(ent.y-p.y,ent.x-p.x); ent.x+=Math.cos(kb)*30; ent.y+=Math.sin(kb)*30;
-        if(isEnemy)clampEnemyPos(ent); else clampPos(ent);
-      };
-      for(const eid in enemies){const e=enemies[eid]; if(!e.dead) hit360(e,true);}
-      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0) hit360(o,false);}
-      p.fervor=100; p.momT=0;
-      fxEv('nova',p.x,p.y,5,0,0,sk.rangeOut*1.15);
-      fxEv('bigswing',p.x,p.y,5,p.fx,p.fy,220);
-      fxEv('bigswing',p.x,p.y,5,-p.fx,-p.fy,220);
-    } else {
-      const facingA=isStep2?Math.atan2(-p.fy,-p.fx):Math.atan2(p.fy,p.fx);
-      const arcUse=isStep2?sk.arc*1.3:sk.arc;
-      const dmgMul2=isStep2?1.3:1;
-      const dmgInBase=applyPassiveOnHit(p,id,null,(sk.dmgIn+POW(p))*mul*dmgMul2);
-      const dmgOutBase=applyPassiveOnHit(p,id,null,(sk.dmgOut+POW(p)*0.6)*mul*dmgMul2);
-      const hitOne=(ent,isEnemy)=>{
-        const dx=ent.x-p.x,dy=ent.y-p.y,d=Math.hypot(dx,dy); if(d>sk.rangeOut)return;
-        const ang=Math.atan2(dy,dx); let df=Math.abs(ang-facingA); if(df>Math.PI)df=2*Math.PI-df; if(df>arcUse)return;
-        const wounded=statusStacks(ent,'wound')>0;
-        if(d<=sk.rangeIn){ let dm=dmgInBase; if(wounded){dm*=isStep2?1.5:1.25; p.hp=Math.min(p.maxhp,p.hp+(isStep2?14:8));}
-          if(isEnemy)hurtEnemy(ent,dm,id); else hurtPlayer(ent,dm*PVP,id);
-        } else { let dm=dmgOutBase; if(wounded)dm*=isStep2?1.5:1.25;
-          if(isEnemy)hurtEnemy(ent,dm,id); else hurtPlayer(ent,dm*PVP,id);
-          addStatus(ent,'wound',{stacks:isStep2?2:1,dur:6,maxStacks:5});
-        }
-      };
-      for(const eid in enemies){const e=enemies[eid]; if(!e.dead) hitOne(e,true);}
-      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0) hitOne(o,false);}
-      p.fervor=Math.min(100,(p.fervor||0)+(isStep2?10:6)); p.momT=0;
-      fxEv('bigswing',p.x,p.y,isStep2?12:35,isStep2?-p.fx:p.fx,isStep2?-p.fy:p.fy,isStep2?170:130);
-    }
+      } else { let dm=dmgOutBase; if(wounded)dm*=woundMul;
+        if(isEnemy)hurtEnemy(ent,dm,id); else hurtPlayer(ent,dm*PVP,id);
+        addStatus(ent,'wound',{stacks:woundStacks,dur:6,maxStacks:5});
+      }
+    };
+    for(const eid in enemies){const e=enemies[eid]; if(!e.dead) hitOne(e,true);}
+    for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0) hitOne(o,false);}
+    p.fervor=(step===3)?100:Math.min(100,(p.fervor||0)+(step===2?10:6)); p.momT=0;
+    fxEv('dash',p.x,p.y,(step===3)?0:15,p.fx,p.fy,0);
+    fxEv('bigswing',p.x,p.y,(step===3)?5:(step===2?12:35),p.fx,p.fy,(step===3)?210:(step===2?170:130));
   }
   else if(sk.type==='wcounter'){
     p.counterT=sk.dur; p.counterDmg=(sk.counterDmg+POW(p))*mul;
@@ -2979,4 +2961,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.63 (combo 3 nhịp thật + fix cooldown) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.64 (sửa combo đúng Riven + chống treo) chạy ở cổng '+PORT));
