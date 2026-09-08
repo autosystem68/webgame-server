@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.65 · Channel/Aim (Tia Diệt Vong) + nhật ký bài học</div>
+  <div id="ver">v0.66 · Pháp Sư hoàn thiện đủ 12 skill</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -788,6 +788,7 @@ var HSPET_EGG_COST_CLIENT=200, myHsPet=null;
 var GEMTYPES={}, myGemCount={};
 var myTraps=[];
 var myCrystals=[];
+var myWells=[];
 document.getElementById('shTabBuy').addEventListener('pointerdown',function(ev){ev.preventDefault();
   shTab='buy'; document.getElementById('shTabBuy').classList.add('on'); document.getElementById('shTabSell').classList.remove('on'); document.getElementById('shTabMount').classList.remove('on');
   document.getElementById('shopBuy').style.display='flex'; document.getElementById('shopSell').style.display='none'; document.getElementById('shopMount').style.display='none';});
@@ -1165,7 +1166,7 @@ ws.onmessage=function(e){
     setTimeout(function(){tt.style.opacity=0;},2600); }
   else if(m.t==='dungeon'){ document.getElementById('dglbl').textContent='🎫 Vé Mật Thất: '+m.entries+'/'+m.max; }
   else if(m.t==='state'){
-    players=m.players; enemies=m.enemies; bolts=m.bolts||[]; loot=m.loot||[]; myPets=m.pets||{}; mySummons=m.summons||{}; myTraps=m.traps||[]; myCrystals=m.crystals||[];
+    players=m.players; enemies=m.enemies; bolts=m.bolts||[]; loot=m.loot||[]; myPets=m.pets||{}; mySummons=m.summons||{}; myTraps=m.traps||[]; myCrystals=m.crystals||[]; myWells=m.wells||[];
     document.getElementById('cnt').textContent=Object.keys(m.players).length;
     var me=players[myId];
     if(me){ myZone=me.zone||'town';
@@ -1502,7 +1503,7 @@ function frame(now){
     var bw=en.boss?70:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-er-10,bw,en.boss?6:4);
     ctx.fillStyle=en.boss?'#e07ab8':'#d06a55';ctx.fillRect(en.x-bw/2,en.y-er-10,bw*Math.max(0,en.hp)/en.maxhp,en.boss?6:4);
     if(en.boss){ctx.fillStyle='#ffb0e0';ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillText('BOSS',en.x,en.y-er-16);}
-    var stIc=''; if(en.wound>0)stIc+='🩸'; if(en.shred)stIc+='💢'; if(en.weak)stIc+='📢'; if(en.marked)stIc+='🎯'; if(en.rooted)stIc+='⛓️'; else if(en.slowed)stIc+='❄️';
+    var stIc=''; if(en.wound>0)stIc+='🩸'; if(en.shred)stIc+='💢'; if(en.weak)stIc+='📢'; if(en.marked)stIc+='🎯'; if(en.arcmarked)stIc+='🔮'; if(en.rooted)stIc+='⛓️'; else if(en.slowed)stIc+='❄️';
     if(stIc){ ctx.font='11px serif';ctx.textAlign='center';ctx.fillText(stIc,en.x,en.y-er-(en.boss?24:16)); }}
 
   for(var li=0;li<loot.length;li++){var it=loot[li]; if(it.zone!==myZone)continue;
@@ -1525,6 +1526,13 @@ function frame(now){
     ctx.save();ctx.globalAlpha=0.25+cp*0.2;ctx.strokeStyle='#6bd0ff';ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(cy.x,cy.y,cy.r,0,7);ctx.stroke();
     ctx.globalAlpha=0.85;ctx.font='16px serif';ctx.textAlign='center';ctx.fillText('🔷',cy.x,cy.y+5);
+    ctx.restore();}
+  for(var wi=0;wi<myWells.length;wi++){var wl=myWells[wi]; if(wl.zone!==myZone)continue;
+    ctx.save();ctx.strokeStyle='#c07aff';ctx.lineWidth=2;
+    for(var wr=0;wr<3;wr++){var spin=performance.now()/500+wr*2.1;
+      ctx.globalAlpha=0.3;
+      ctx.beginPath();ctx.arc(wl.x,wl.y,wl.r*(0.35+wr*0.28),spin,spin+2.2);ctx.stroke();}
+    ctx.globalAlpha=0.9;ctx.font='18px serif';ctx.textAlign='center';ctx.fillText('🌀',wl.x,wl.y+6);
     ctx.restore();}
 
   for(var b=0;b<bolts.length;b++){var bl=bolts[b]; if(bl.zone!==myZone)continue; var br=bl.r||6;var kind=bl.kind||'bolt';
@@ -1571,7 +1579,7 @@ function frame(now){
     ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
     ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
     ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
-    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
+    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
     if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-44); }
     ctx.globalAlpha=1;
   }
@@ -1688,6 +1696,7 @@ let bolts = [];
 let loot = [];
 let traps = [];
 let crystals = [];
+let wells = [];
 const sockets = {};
 let nextP = 1, nextE = 1, nextL = 1;
 
@@ -1741,7 +1750,7 @@ wss.on('connection',(ws)=>{
     passT:0,comboN:0,comboTgt:null,spellBladeT:0,party:null,pendingInvite:null,guild:null,fervor:0,focus:0,momentum:0,arcane:0,authority:0,counterT:0,counterDmg:0,momT:0,
     warcryDefT:0,warcryDefMul:1,debtT:0,debtAmount:0,debtTargetObj:null,debtIsEnemy:false,debtBankPct:0.3,lastStandT:0,momGenBonus:0,
     duelT:0,duelTargetObj:null,duelIsEnemy:false,duelElapsed:0,duelGrowth:0.15,duelTickT:0,duelBaseDmg:10,
-    chargeStart:{},chargeMul:1,chargeTier:0,comboState:null,channelState:null,
+    chargeStart:{},chargeMul:1,chargeTier:0,comboState:null,channelState:null,echoPos:null,echoExpire:0,
     huntTargetObj:null,huntStack:0,windguardT:0,windguardArc:0.9,windguardMul:1,windguardFx:0,windguardFy:1,
     wildHuntT:0,wildHuntTargetObj:null,aspdBonusWH:0,rhythmFx:0,rhythmFy:1,rhythmT:0,rhythmReady:false,
     cum:{killForest:0,killCave:0,bossForest:0,bossCave:0},npcAccepted:{},npcClaimed:{},nearNpc:null,
@@ -1906,12 +1915,20 @@ const SKILLS = {
       desc:'Tạo 1 đường năng lượng thẳng phía trước — kẻ địch trúng bị sát thương + làm chậm + mất Mana (chỉ người chơi). Đổi hệ sang Huyền Bí kích phản ứng Nguyên Tố.'},
     {id:'m5',name:'Tia Diệt Vong',icon:'☄️',type:'cataclysm', mp:55,cd:13,  unlockLv:10, len:420,width:50,dmg:26,elem:'arcane',scaleKey:'dmg',channelable:true,channelDur:2.0,channelTick:0.2,
       desc:'GIỮ để bắn tia liên tục (2s) — trong lúc giữ, KÉO để XOAY tia theo hướng mới liên tục, không cần thả ra bắn lại. Mỗi 0.2s gây 1 đợt sát thương dọc tia. Thả sớm = tia ngắn hơn nhưng vẫn tính hồi chiêu đủ. Sát thương tăng nếu mục tiêu vừa trúng phản ứng Nguyên Tố.'},
-    {id:'m6',name:'Băng Trói',  icon:'🧊',type:'proj', mp:20,cd:4,   unlockLv:13, count:1,dmg:24,speed:460,r:8,slowMul:0.45,slowDur:2.5,scaleKey:'dmg',
-      desc:'Tên băng đơn mục tiêu, làm chậm mạnh mục tiêu trúng đòn.'},
+    {id:'m6',name:'Bước Ảnh',   icon:'🪞',type:'mirrorstep', mp:22,cd:9,   unlockLv:13, dist:170,tauntR:130,confuseDur:1.5,
+      desc:'Dịch chuyển ngắn tới hướng chỉ định, để lại 1 ảo ảnh — quái gần đó bị rối loạn ngắn (giảm mạnh tốc chạy 1.5s, như đang đuổi theo ảnh giả). Dùng để thoát hiểm hoặc tạo khoảng cách bất ngờ.'},
     {id:'m7',name:'Lá Chắn Phép',icon:'🔷',type:'shield',mp:24,cd:10,unlockLv:16, amount:70,dur:5, reqStat:'VIT',reqVal:15,scaleKey:'amount',
       desc:'Tạo khiên chắn hấp thụ sát thương trong 5s. Nhánh Sinh Tồn (cần Sinh Lực).'},
     {id:'m8',name:'Hút Hồn',    icon:'💜',type:'lifesteal',mp:20,cd:4,unlockLv:20,range:380,dmg:34,lsPct:0.55, reqStat:'INT',reqVal:20,scaleKey:'dmg',
       desc:'Đòn phép tầm xa, hồi máu bằng 55% sát thương gây ra. Nhánh Hút Máu (cần Trí Tuệ cao).'},
+    {id:'m9',name:'Vọng Thời Gian',icon:'⏳',type:'timeecho', mp:18,cd:16,  unlockLv:23, dur:5,
+      desc:'Lần 1: ghi lại vị trí hiện tại (còn hiệu lực 5s). Bấm lại trong 5s đó: DỊCH CHUYỂN NGAY VỀ đúng vị trí đã ghi (không hồi máu, chỉ đổi vị trí) — dùng để rút lui khẩn hoặc quay lại điểm chiến thuật.'},
+    {id:'m10',name:'Vực Hút Trọng Lực',icon:'🌀',type:'gravitywell', mp:30,cd:12, unlockLv:26, range:300,radius:130,life:2.5,pullSpd:40,dmg:8,
+      desc:'Tạo 1 vùng hút tại vị trí ngắm, tồn tại 2.5s — kẻ địch trong vùng bị kéo dần vào tâm + chịu sát thương nhỏ liên tục. Không mạnh nhưng GOM địch lại để tận dụng Tia Diệt Vong/Dây Huyền Bí ngay sau đó.'},
+    {id:'m11',name:'Phong Ấn Huyền Bí',icon:'🔮',type:'arcanedet', mp:20,cd:8, unlockLv:29, range:400,dur:6,bonusPct:0.5,
+      desc:'Đóng dấu 1 mục tiêu, KHÔNG gây sát thương ngay. Đòn phép TIẾP THEO của bạn đánh trúng nó sẽ được +50% sát thương và tiêu luôn dấu — đặt dấu trước rồi tung đòn mạnh sau, đúng tinh thần combo-nguyên-tố.'},
+    {id:'m12',name:'Chuyển Hệ',  icon:'♻️',type:'elemshift', mp:10,cd:5, unlockLv:32,
+      desc:'Chủ động đổi hệ Nguyên Tố hiện tại sang hệ TIẾP THEO trong vòng Lửa→Băng→Huyền Bí→Lửa — dùng để tự tạo phản ứng combo mà không cần đổi skill, tốn ít mana, hồi chiêu ngắn.'},
   ],
   arc: [
     {id:'a1',name:'Bước Ma',    icon:'💨',type:'dash', mp:10,cd:2.0, unlockLv:2,  dist:150,
@@ -2030,6 +2047,7 @@ function auraBonus(p){ // Chỉ Huy: đồng minh gần được +8% dmg từ ch
   return 0;
 }
 function markBonus(ent){ const s=getStatus(ent,'huntmark'); return s?(1+(s.data.bonus||0)):1; }
+function arcMarkBonus(ent){ const s=getStatus(ent,'arcmark'); if(!s)return 1; clearStatus(ent,'arcmark'); return 1+(s.data.bonus||0); }
 function mageReaction(p,sk){
   if(!sk.elem)return 1;
   let bonus=1;
@@ -2281,6 +2299,40 @@ function execSkill(p,id,sk,rank,step){
     for(const eid in enemies){const e=enemies[eid]; if(!e.dead && e.zone===p.zone && hitRect(e)) hurtEnemy(e,dmg,id); }
     for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(o.chosen&&!o.dead&&o.iframe<=0&&o.zone===p.zone&&!zoneOf(o).safe&&hitRect(o)) hurtPlayer(o,dmg*PVP,id); }
     fxEv('ring',p.x+p.fx*sk.len*0.5,p.y+p.fy*sk.len*0.5,280,0,0,sk.width);
+  }
+  else if(sk.type==='mirrorstep'){
+    const oldX=p.x, oldY=p.y;
+    p.x+=p.fx*sk.dist; p.y+=p.fy*sk.dist; clampPos(p); p.iframe=Math.max(p.iframe||0,0.3);
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
+      if(Math.hypot(e.x-oldX,e.y-oldY)<sk.tauntR){ e.slowT=sk.confuseDur; e.slowMul=0.3; }}
+    fxEv('ring',oldX,oldY,280,0,0,40);
+    fxEv('dash',p.x,p.y,280,p.fx,p.fy,0);
+  }
+  else if(sk.type==='timeecho'){
+    if(p.echoPos && p.echoExpire>Date.now()){
+      p.x=p.echoPos.x; p.y=p.echoPos.y; clampPos(p);
+      fxEv('dash',p.x,p.y,280,0,0,0);
+      p.echoPos=null;
+    } else {
+      p.echoPos={x:p.x,y:p.y}; p.echoExpire=Date.now()+(sk.dur||5)*1000;
+      fxEv('ring',p.x,p.y,280,0,0,30);
+    }
+  }
+  else if(sk.type==='gravitywell'){
+    const rng=sk.range*(p.aimMag||1);
+    const wx=p.x+p.fx*rng, wy=p.y+p.fy*rng;
+    wells.push({x:wx,y:wy,zone:p.zone,radius:sk.radius,life:sk.life,pullSpd:sk.pullSpd,dmg:sk.dmg,owner:id,tickT:0});
+    fxEv('ring',wx,wy,280,0,0,sk.radius);
+  }
+  else if(sk.type==='arcanedet'){
+    const hit=nearestHostile(p,id,sk.range);
+    if(hit){ addStatus(hit.ent,'arcmark',{dur:sk.dur,data:{bonus:sk.bonusPct}}); fxEv('ring',hit.ent.x,hit.ent.y,280,0,0,30); }
+  }
+  else if(sk.type==='elemshift'){
+    const cyc={fire:'frost',frost:'arcane',arcane:'fire'};
+    const nx=cyc[p.arcaneState]||'fire';
+    p.arcaneState=nx; p.arcaneStateT=4;
+    fxEv('ring',p.x,p.y,nx==='fire'?20:(nx==='frost'?200:280),0,0,25);
   }
   else if(sk.type==='cone'){
     let fbonus=1;
@@ -2939,11 +2991,11 @@ setInterval(()=>{
     const zw=(ZONES[b.zone]||ZONES.town).w, zh=(ZONES[b.zone]||ZONES.town).h;
     const fireBonus=(ent)=>{ if(!b.isFire)return 0; if(getStatus(ent,'frostmark')){ hitEv(ent.x,ent.y-30,'Bùng nổ!',false); return (b.curDmg||b.dmg)*0.8; } return b.burnDmg||0; };
     for(const eid in enemies){const e=enemies[eid];if(e.dead||e.zone!==b.zone||b.hitSet.includes(eid))continue;if(Math.hypot(e.x-b.x,e.y-b.y)<(e.boss?38:24)){
-      hurtEnemy(e,(b.curDmg||b.dmg)*markBonus(e)+fireBonus(e),b.owner);if(b.slowMul){e.slowT=b.slowDur;e.slowMul=b.slowMul;}
+      hurtEnemy(e,((b.curDmg||b.dmg)*markBonus(e)+fireBonus(e))*arcMarkBonus(e),b.owner);if(b.slowMul){e.slowT=b.slowDur;e.slowMul=b.slowMul;}
       if(b.pierce && b.pierce>1){ b.pierce--; b.hitSet.push(eid); b.curDmg=(b.curDmg||b.dmg)*(b.falloff||1); } else { removed=true; }
       break;}}
     if(!removed)for(const pid in players){if(pid==b.owner||b.hitSet.includes(pid))continue;const o=players[pid];if(!o.chosen||o.dead||o.iframe>0||o.zone!==b.zone||zoneOf(o).safe)continue;if(Math.hypot(o.x-b.x,o.y-b.y)<25){
-      hurtPlayer(o,((b.curDmg||b.dmg)*markBonus(o)+fireBonus(o))*PVP,b.owner);if(b.slowMul){o.slowT=b.slowDur;o.slowMul=b.slowMul;}
+      hurtPlayer(o,(((b.curDmg||b.dmg)*markBonus(o)+fireBonus(o))*arcMarkBonus(o))*PVP,b.owner);if(b.slowMul){o.slowT=b.slowDur;o.slowMul=b.slowMul;}
       if(b.pierce && b.pierce>1){ b.pierce--; b.hitSet.push(pid); b.curDmg=(b.curDmg||b.dmg)*(b.falloff||1); } else { removed=true; }
       break;}}
     if(removed||b.x<0||b.x>zw||b.y<0||b.y>zh||b.life<=0)bolts.splice(i,1);
@@ -2967,22 +3019,36 @@ setInterval(()=>{
       if(Math.hypot(o.x-cr.x,o.y-cr.y)<cr.radius) addStatus(o,'frostmark',{dur:0.5}); }
     if(cr.life<=0) crystals.splice(i,1);
   }
+  for(let i=wells.length-1;i>=0;i--){const w=wells[i]; w.life-=dt; w.tickT-=dt;
+    const doTick=(w.tickT<=0);
+    if(doTick)w.tickT=0.5;
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==w.zone)continue;
+      const dx=w.x-e.x,dy=w.y-e.y,d=Math.hypot(dx,dy); if(d>w.radius||d<1)continue;
+      e.x+=(dx/d)*w.pullSpd*dt; e.y+=(dy/d)*w.pullSpd*dt; clampEnemyPos(e);
+      if(doTick) hurtEnemy(e,w.dmg,w.owner); }
+    for(const pid in players){const o=players[pid]; if(!o.chosen||o.dead||o.zone!==w.zone||zoneOf(o).safe||pid==w.owner)continue;
+      const dx=w.x-o.x,dy=w.y-o.y,d=Math.hypot(dx,dy); if(d>w.radius||d<1)continue;
+      o.x+=(dx/d)*w.pullSpd*dt; o.y+=(dy/d)*w.pullSpd*dt; clampPos(o);
+      if(doTick) hurtPlayer(o,w.dmg*PVP,w.owner); }
+    if(w.life<=0) wells.splice(i,1);
+  }
   const psPublic={}; for(const id in players){const p=players[id];if(!p.chosen)continue;
     try{
       psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,
         spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0),
-        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),
+        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),
         slowed:(p.slowT>0&&(p.slowMul||1)>=0.15),rooted:(p.slowT>0&&(p.slowMul||1)<0.15)};
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
   const es={}; for(const eid in enemies){const e=enemies[eid];
     es[eid]={x:r1(e.x),y:r1(e.y),zone:e.zone,hp:r1(e.hp),maxhp:e.maxhp,dead:e.dead,boss:e.boss,r:e.r,
-      wound:statusStacks(e,'wound'),shred:!!getStatus(e,'shred'),weak:(e.atkDebuffT>0),marked:!!getStatus(e,'huntmark'),
+      wound:statusStacks(e,'wound'),shred:!!getStatus(e,'shred'),weak:(e.atkDebuffT>0),marked:!!getStatus(e,'huntmark'),arcmarked:!!getStatus(e,'arcmark'),
       slowed:(e.slowT>0&&(e.slowMul||1)>=0.15),rooted:(e.slowT>0&&(e.slowMul||1)<0.15)};}
   const bs=bolts.map(b=>({x:r1(b.x),y:r1(b.y),zone:b.zone,hue:b.hue,kind:b.kind||'bolt',r:b.r||6,a:r2(Math.atan2(b.vy,b.vx))}));
   const ls=loot.map(it=>({id:it.item.id,x:r1(it.x),y:r1(it.y),zone:it.zone,slot:it.item.slot,tier:it.item.tier}));
   const trs=traps.map((tr,i)=>({id:i,x:r1(tr.x),y:r1(tr.y),zone:tr.zone,r:tr.triggerR}));
   const crs=crystals.map((cr,i)=>({id:i,x:r1(cr.x),y:r1(cr.y),zone:cr.zone,r:cr.radius}));
+  const wls=wells.map((w,i)=>({id:i,x:r1(w.x),y:r1(w.y),zone:w.zone,r:w.radius}));
   const bt={}; for(const z in zoneBoss)bt[z]={phase:zoneBoss[z].phase,t:Math.ceil(zoneBoss[z].t)};
   const pd={}; for(const id in players){const p=players[id]; if(!p.chosen||!p.pet)continue;
     const pt=PET_TYPES.find(t=>t.id===p.pet.type);
@@ -2999,11 +3065,11 @@ setInterval(()=>{
         hspet:p.hspet?{stat:p.hspet.stat,hunger:Math.round(p.hspet.hunger)}:null,
         pkScore:Math.round(p.pkScore||0),jailed:Math.round(p.jailed||0)});
       const psOut=Object.assign({},psPublic,{[id]:mine});
-      sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd,summons:sd,traps:trs,crystals:crs});
+      sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd,summons:sd,traps:trs,crystals:crs,wells:wls});
     }catch(err){ console.error('⚠️ Lỗi gửi state cho #'+id+' (đã chặn, không ảnh hưởng người khác):', err && err.message); }
   }
  }catch(tickErr){ console.error('⚠️ Lỗi trong vòng lặp chính (đã chặn, tick sau sẽ chạy lại bình thường):', tickErr && tickErr.message); }
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.65 (Channel/Aim Tia Diệt Vong) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.66 (Pháp Sư hoàn thiện 12 skill) chạy ở cổng '+PORT));
