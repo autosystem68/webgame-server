@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.66 · Pháp Sư hoàn thiện đủ 12 skill</div>
+  <div id="ver">v0.67 · sửa 3 lỗi thật + phân loại cast đúng</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -789,6 +789,7 @@ var GEMTYPES={}, myGemCount={};
 var myTraps=[];
 var myCrystals=[];
 var myWells=[];
+var myIllusions=[];
 document.getElementById('shTabBuy').addEventListener('pointerdown',function(ev){ev.preventDefault();
   shTab='buy'; document.getElementById('shTabBuy').classList.add('on'); document.getElementById('shTabSell').classList.remove('on'); document.getElementById('shTabMount').classList.remove('on');
   document.getElementById('shopBuy').style.display='flex'; document.getElementById('shopSell').style.display='none'; document.getElementById('shopMount').style.display='none';});
@@ -1166,7 +1167,7 @@ ws.onmessage=function(e){
     setTimeout(function(){tt.style.opacity=0;},2600); }
   else if(m.t==='dungeon'){ document.getElementById('dglbl').textContent='🎫 Vé Mật Thất: '+m.entries+'/'+m.max; }
   else if(m.t==='state'){
-    players=m.players; enemies=m.enemies; bolts=m.bolts||[]; loot=m.loot||[]; myPets=m.pets||{}; mySummons=m.summons||{}; myTraps=m.traps||[]; myCrystals=m.crystals||[]; myWells=m.wells||[];
+    players=m.players; enemies=m.enemies; bolts=m.bolts||[]; loot=m.loot||[]; myPets=m.pets||{}; mySummons=m.summons||{}; myTraps=m.traps||[]; myCrystals=m.crystals||[]; myWells=m.wells||[]; myIllusions=m.illusions||[];
     document.getElementById('cnt').textContent=Object.keys(m.players).length;
     var me=players[myId];
     if(me){ myZone=me.zone||'town';
@@ -1312,17 +1313,22 @@ var comboPrompt={active:false,slot:null,until:0};
 var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
 function isChannelable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].channelable; } return false; }
+var AIMABLE_TYPES={dash:1,warcleave:1,predstep:1,groundbreak:1,pierce:1,huntmark:1,trap:1,starfall:1,windguard:1,
+  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,proj:1,cone:1,nova:1,slow:1,leap:1};
+function isAimable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!AIMABLE_TYPES[myFull[i].type]; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
-  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,lastAimSendT=0;
+  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,wasAimable=false,lastAimSendT=0;
   btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
     if(cd[k]>0)return;
     startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;
     try{btn.setPointerCapture(ev.pointerId);}catch(e){}
-    wasCharge=isChargeable(k); wasChannel=isChannelable(k);
+    wasCharge=isChargeable(k); wasChannel=isChannelable(k); wasAimable=isAimable(k);
     if(wasCharge){ if(ws.readyState===1)ws.send(JSON.stringify({t:'chargestart',k:k})); chargeState.active=true;chargeState.slot=k;chargeState.startT=performance.now(); }
     if(wasChannel){ if(ws.readyState===1)ws.send(JSON.stringify({t:'channelstart',k:k})); }
-    holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},(wasCharge||wasChannel)?0:160);
+    if(wasCharge||wasChannel||wasAimable){
+      holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},(wasCharge||wasChannel)?0:160);
+    }
   });
   btn.addEventListener('pointermove',function(ev){
     if(!holding)return;
@@ -1534,6 +1540,13 @@ function frame(now){
       ctx.beginPath();ctx.arc(wl.x,wl.y,wl.r*(0.35+wr*0.28),spin,spin+2.2);ctx.stroke();}
     ctx.globalAlpha=0.9;ctx.font='18px serif';ctx.textAlign='center';ctx.fillText('🌀',wl.x,wl.y+6);
     ctx.restore();}
+  for(var ili=0;ili<myIllusions.length;ili++){var il=myIllusions[ili]; if(il.zone!==myZone)continue;
+    var flick=0.35+0.25*Math.abs(Math.sin(performance.now()/150));
+    ctx.save();ctx.globalAlpha=flick;
+    ctx.fillStyle='hsl('+(il.hue||280)+',70%,60%)';ctx.strokeStyle='#fff';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(il.x,il.y,15,0,7);ctx.fill();ctx.stroke();
+    ctx.globalAlpha=flick*0.8;ctx.font='11px serif';ctx.textAlign='center';ctx.fillText('👻',il.x,il.y-22);
+    ctx.restore();}
 
   for(var b=0;b<bolts.length;b++){var bl=bolts[b]; if(bl.zone!==myZone)continue; var br=bl.r||6;var kind=bl.kind||'bolt';
     ctx.save();ctx.shadowColor='hsl('+bl.hue+',85%,65%)';ctx.shadowBlur=10;ctx.fillStyle='hsl('+bl.hue+',85%,65%)';ctx.strokeStyle='hsl('+bl.hue+',85%,70%)';
@@ -1600,7 +1613,7 @@ function frame(now){
       var maxR=aimSk.range||160, curR=maxR*aimState.mag;
       var tx2=apx+aimState.dx*curR, ty2=apy+aimState.dy*curR;
       ctx.save();ctx.globalAlpha=0.55;ctx.strokeStyle='#ffb060';ctx.fillStyle='#ffb06030';ctx.lineWidth=2;
-      if(aimSk.type==='trap'||aimSk.type==='frostprism'){
+      if(aimSk.type==='trap'||aimSk.type==='frostprism'||aimSk.type==='gravitywell'){
         ctx.beginPath();ctx.arc(tx2,ty2,aimSk.radius||60,0,7);ctx.fill();ctx.stroke();
         ctx.beginPath();ctx.moveTo(apx,apy);ctx.lineTo(tx2,ty2);ctx.setLineDash([5,5]);ctx.stroke();ctx.setLineDash([]);
       } else if(aimSk.arc && aimSk.arc>0.3 && !aimSk.len){
@@ -1697,6 +1710,7 @@ let loot = [];
 let traps = [];
 let crystals = [];
 let wells = [];
+let illusions = [];
 const sockets = {};
 let nextP = 1, nextE = 1, nextL = 1;
 
@@ -1915,14 +1929,14 @@ const SKILLS = {
       desc:'Tạo 1 đường năng lượng thẳng phía trước — kẻ địch trúng bị sát thương + làm chậm + mất Mana (chỉ người chơi). Đổi hệ sang Huyền Bí kích phản ứng Nguyên Tố.'},
     {id:'m5',name:'Tia Diệt Vong',icon:'☄️',type:'cataclysm', mp:55,cd:13,  unlockLv:10, len:420,width:50,dmg:26,elem:'arcane',scaleKey:'dmg',channelable:true,channelDur:2.0,channelTick:0.2,
       desc:'GIỮ để bắn tia liên tục (2s) — trong lúc giữ, KÉO để XOAY tia theo hướng mới liên tục, không cần thả ra bắn lại. Mỗi 0.2s gây 1 đợt sát thương dọc tia. Thả sớm = tia ngắn hơn nhưng vẫn tính hồi chiêu đủ. Sát thương tăng nếu mục tiêu vừa trúng phản ứng Nguyên Tố.'},
-    {id:'m6',name:'Bước Ảnh',   icon:'🪞',type:'mirrorstep', mp:22,cd:9,   unlockLv:13, dist:170,tauntR:130,confuseDur:1.5,
-      desc:'Dịch chuyển ngắn tới hướng chỉ định, để lại 1 ảo ảnh — quái gần đó bị rối loạn ngắn (giảm mạnh tốc chạy 1.5s, như đang đuổi theo ảnh giả). Dùng để thoát hiểm hoặc tạo khoảng cách bất ngờ.'},
+    {id:'m6',name:'Bước Ảnh',   icon:'🪞',type:'mirrorstep', mp:22,cd:9,   unlockLv:13, dist:170,tauntR:130,confuseDur:3.5,
+      desc:'Dịch chuyển ngắn tới hướng chỉ định, để lại 1 ẢO ẢNH có hình dạng bạn tại vị trí cũ (tồn tại 3.5s) — quái gần đó ưu tiên lao vào đánh ảo ảnh thay vì bạn. Dùng để thoát hiểm hoặc đánh lạc hướng khi bị vây.'},
     {id:'m7',name:'Lá Chắn Phép',icon:'🔷',type:'shield',mp:24,cd:10,unlockLv:16, amount:70,dur:5, reqStat:'VIT',reqVal:15,scaleKey:'amount',
       desc:'Tạo khiên chắn hấp thụ sát thương trong 5s. Nhánh Sinh Tồn (cần Sinh Lực).'},
     {id:'m8',name:'Hút Hồn',    icon:'💜',type:'lifesteal',mp:20,cd:4,unlockLv:20,range:380,dmg:34,lsPct:0.55, reqStat:'INT',reqVal:20,scaleKey:'dmg',
       desc:'Đòn phép tầm xa, hồi máu bằng 55% sát thương gây ra. Nhánh Hút Máu (cần Trí Tuệ cao).'},
-    {id:'m9',name:'Vọng Thời Gian',icon:'⏳',type:'timeecho', mp:18,cd:16,  unlockLv:23, dur:5,
-      desc:'Lần 1: ghi lại vị trí hiện tại (còn hiệu lực 5s). Bấm lại trong 5s đó: DỊCH CHUYỂN NGAY VỀ đúng vị trí đã ghi (không hồi máu, chỉ đổi vị trí) — dùng để rút lui khẩn hoặc quay lại điểm chiến thuật.'},
+    {id:'m9',name:'Vọng Thời Gian',icon:'⏳',type:'timeecho', mp:18,cd:16,  unlockLv:23, dur:5,comboNext:true,comboMaxStep:2,comboWindow:5000,maxDist:500,
+      desc:'Lần 1: ghi lại vị trí hiện tại (còn hiệu lực 5s, tự cast tại chỗ — không cần ngắm hướng gì cả). Bấm lại trong 5s đó (miễn còn cách chỗ ghi tối đa 500): DỊCH CHUYỂN NGAY VỀ đúng vị trí đã ghi (không hồi máu, chỉ đổi vị trí).'},
     {id:'m10',name:'Vực Hút Trọng Lực',icon:'🌀',type:'gravitywell', mp:30,cd:12, unlockLv:26, range:300,radius:130,life:2.5,pullSpd:40,dmg:8,
       desc:'Tạo 1 vùng hút tại vị trí ngắm, tồn tại 2.5s — kẻ địch trong vùng bị kéo dần vào tâm + chịu sát thương nhỏ liên tục. Không mạnh nhưng GOM địch lại để tận dụng Tia Diệt Vong/Dây Huyền Bí ngay sau đó.'},
     {id:'m11',name:'Phong Ấn Huyền Bí',icon:'🔮',type:'arcanedet', mp:20,cd:8, unlockLv:29, range:400,dur:6,bonusPct:0.5,
@@ -2303,18 +2317,18 @@ function execSkill(p,id,sk,rank,step){
   else if(sk.type==='mirrorstep'){
     const oldX=p.x, oldY=p.y;
     p.x+=p.fx*sk.dist; p.y+=p.fy*sk.dist; clampPos(p); p.iframe=Math.max(p.iframe||0,0.3);
-    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
-      if(Math.hypot(e.x-oldX,e.y-oldY)<sk.tauntR){ e.slowT=sk.confuseDur; e.slowMul=0.3; }}
+    illusions.push({x:oldX,y:oldY,zone:p.zone,life:sk.confuseDur||3,cls:p.cls,hue:p.hue});
     fxEv('ring',oldX,oldY,280,0,0,40);
     fxEv('dash',p.x,p.y,280,p.fx,p.fy,0);
   }
   else if(sk.type==='timeecho'){
-    if(p.echoPos && p.echoExpire>Date.now()){
-      p.x=p.echoPos.x; p.y=p.echoPos.y; clampPos(p);
-      fxEv('dash',p.x,p.y,280,0,0,0);
+    if(step===2 && p.echoPos){
+      const dist=Math.hypot(p.x-p.echoPos.x,p.y-p.echoPos.y);
+      if(dist<=(sk.maxDist||500)){ p.x=p.echoPos.x; p.y=p.echoPos.y; clampPos(p); fxEv('dash',p.x,p.y,280,0,0,0); }
+      else { fxEv('ring',p.x,p.y,0,0,0,20); } // quá xa điểm ghi — không quay được, chỉ báo hụt
       p.echoPos=null;
     } else {
-      p.echoPos={x:p.x,y:p.y}; p.echoExpire=Date.now()+(sk.dur||5)*1000;
+      p.echoPos={x:p.x,y:p.y};
       fxEv('ring',p.x,p.y,280,0,0,30);
     }
   }
@@ -2980,11 +2994,15 @@ setInterval(()=>{
     if(e.dead){e.respawnT-=dt;if(e.respawnT<=0){const wasBoss=e.boss,z=e.zone;delete enemies[eid];
       if(wasBoss){ if(z==='dungeon')spawnBoss(z); } else spawnEnemy(z);}continue;}
     if(e.atk>0)e.atk-=dt; if(e.slowT>0)e.slowT-=dt; if(e.atkDebuffT>0)e.atkDebuffT-=dt; tickStatuses(e,dt);
-    let tp=null,best=1e9;
-    for(const id in players){const p=players[id];if(!p.chosen||p.dead||p.zone!==e.zone)continue;const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<best){best=d;tp=p;}}
+    let tp=null,tpIll=false,best=1e9;
+    for(const id in players){const p=players[id];if(!p.chosen||p.dead||p.zone!==e.zone)continue;const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<best){best=d;tp=p;tpIll=false;}}
+    for(let ii=0;ii<illusions.length;ii++){const il=illusions[ii]; if(il.zone!==e.zone)continue; const d=Math.hypot(il.x-e.x,il.y-e.y)*0.6; if(d<best){best=d;tp=il;tpIll=true;}}
     const espd=e.spd*((e.slowT>0)?(e.slowMul||1):1);
     if(tp){ const reach=15+e.r; if(best>reach){const a=Math.atan2(tp.y-e.y,tp.x-e.x);e.x+=Math.cos(a)*espd*dt;e.y+=Math.sin(a)*espd*dt;}
-      else if(e.atk<=0){ const a=Math.atan2(tp.y-e.y,tp.x-e.x); e.x+=Math.cos(a)*12;e.y+=Math.sin(a)*12; hurtPlayer(tp,(e.dmg||6)*((e.atkDebuffT>0)?(e.atkDebuffMul||1):1),null,e); fxEv('bite',tp.x,tp.y,0,Math.cos(a),Math.sin(a),0); e.atk=e.boss?1.4:1.0; } }
+      else if(e.atk<=0){ const a=Math.atan2(tp.y-e.y,tp.x-e.x); e.x+=Math.cos(a)*12;e.y+=Math.sin(a)*12;
+        if(tpIll){ fxEv('bite',tp.x,tp.y,280,Math.cos(a),Math.sin(a),0); }
+        else { hurtPlayer(tp,(e.dmg||6)*((e.atkDebuffT>0)?(e.atkDebuffMul||1):1),null,e); fxEv('bite',tp.x,tp.y,0,Math.cos(a),Math.sin(a),0); }
+        e.atk=e.boss?1.4:1.0; } }
   }
   for(let i=bolts.length-1;i>=0;i--){const b=bolts[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
     let removed=false; if(!b.hitSet)b.hitSet=[];
@@ -3032,6 +3050,7 @@ setInterval(()=>{
       if(doTick) hurtPlayer(o,w.dmg*PVP,w.owner); }
     if(w.life<=0) wells.splice(i,1);
   }
+  for(let i=illusions.length-1;i>=0;i--){ illusions[i].life-=dt; if(illusions[i].life<=0) illusions.splice(i,1); }
   const psPublic={}; for(const id in players){const p=players[id];if(!p.chosen)continue;
     try{
       psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,
@@ -3049,6 +3068,7 @@ setInterval(()=>{
   const trs=traps.map((tr,i)=>({id:i,x:r1(tr.x),y:r1(tr.y),zone:tr.zone,r:tr.triggerR}));
   const crs=crystals.map((cr,i)=>({id:i,x:r1(cr.x),y:r1(cr.y),zone:cr.zone,r:cr.radius}));
   const wls=wells.map((w,i)=>({id:i,x:r1(w.x),y:r1(w.y),zone:w.zone,r:w.radius}));
+  const ils=illusions.map((il,i)=>({id:i,x:r1(il.x),y:r1(il.y),zone:il.zone,cls:il.cls,hue:il.hue}));
   const bt={}; for(const z in zoneBoss)bt[z]={phase:zoneBoss[z].phase,t:Math.ceil(zoneBoss[z].t)};
   const pd={}; for(const id in players){const p=players[id]; if(!p.chosen||!p.pet)continue;
     const pt=PET_TYPES.find(t=>t.id===p.pet.type);
@@ -3065,11 +3085,11 @@ setInterval(()=>{
         hspet:p.hspet?{stat:p.hspet.stat,hunger:Math.round(p.hspet.hunger)}:null,
         pkScore:Math.round(p.pkScore||0),jailed:Math.round(p.jailed||0)});
       const psOut=Object.assign({},psPublic,{[id]:mine});
-      sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd,summons:sd,traps:trs,crystals:crs,wells:wls});
+      sendTo(id,{t:'state',players:psOut,enemies:es,bolts:bs,loot:ls,bossTimers:bt,pets:pd,summons:sd,traps:trs,crystals:crs,wells:wls,illusions:ils});
     }catch(err){ console.error('⚠️ Lỗi gửi state cho #'+id+' (đã chặn, không ảnh hưởng người khác):', err && err.message); }
   }
  }catch(tickErr){ console.error('⚠️ Lỗi trong vòng lặp chính (đã chặn, tick sau sẽ chạy lại bình thường):', tickErr && tickErr.message); }
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.66 (Pháp Sư hoàn thiện 12 skill) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.67 (sửa 3 lỗi thật + phân loại cast) chạy ở cổng '+PORT));
