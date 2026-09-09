@@ -584,7 +584,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.69 · hồng tâm chuẩn xác + fix party + AOE Vọng TG</div>
+  <div id="ver">v0.70 · hồng tâm thuần + combo xen kẽ + hủy skill</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1307,7 +1307,7 @@ function cast(k,aim){ if(cd[k]>0)return; var me=players[myId];
 function flash(k){var id={b:'sB',q:'sQ',w:'sW',e:'sE',r:'sR'}[k];var el=document.getElementById(id);
   el.animate([{transform:'translateX(-3px)'},{transform:'translateX(3px)'},{transform:'translateX(0)'}],{duration:140});}
 function bindBtn(id,k){document.getElementById(id).addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();cast(k);});}
-var aimState={active:false,slot:null,dx:0,dy:1,mag:0,ox:0,oy:0};
+var aimState={active:false,slot:null,dx:0,dy:1,mag:0,ox:0,oy:0,cancelZone:false};
 var chargeState={active:false,slot:null,startT:0};
 var comboPrompt={active:false,slot:null,until:0};
 var AIM_MAX_PX=90;
@@ -1318,21 +1318,23 @@ var AIMABLE_TYPES={dash:1,warcleave:1,predstep:1,groundbreak:1,pierce:1,huntmark
 function isAimable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!AIMABLE_TYPES[myFull[i].type]; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
-  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,wasAimable=false,lastAimSendT=0;
+  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,wasAimable=false,lastAimSendT=0,nearCancel=false;
   btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
     if(cd[k]>0)return;
-    startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;
+    startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;nearCancel=false;
     try{btn.setPointerCapture(ev.pointerId);}catch(e){}
     wasCharge=isChargeable(k); wasChannel=isChannelable(k); wasAimable=isAimable(k);
     if(wasCharge){ if(ws.readyState===1)ws.send(JSON.stringify({t:'chargestart',k:k})); chargeState.active=true;chargeState.slot=k;chargeState.startT=performance.now(); }
     if(wasChannel){ if(ws.readyState===1)ws.send(JSON.stringify({t:'channelstart',k:k})); }
     if(wasCharge||wasChannel||wasAimable){
-      holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;},(wasCharge||wasChannel)?0:160);
+      holdTimer=setTimeout(function(){holding=true;aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;aimState.cancelZone=false;},(wasCharge||wasChannel)?0:160);
     }
   });
   btn.addEventListener('pointermove',function(ev){
     if(!holding)return;
     var dx=ev.clientX-startX, dy=ev.clientY-startY, d=Math.hypot(dx,dy);
+    nearCancel=(d<26) && !wasChannel;
+    aimState.cancelZone=nearCancel;
     if(d>4){ dragged=true; aimState.dx=dx/d; aimState.dy=dy/d; aimState.mag=Math.min(1,d/AIM_MAX_PX);
       if(wasChannel){ var now=performance.now(); if(now-lastAimSendT>70){ lastAimSendT=now; if(ws.readyState===1)ws.send(JSON.stringify({t:'channelaim',k:k,dx:aimState.dx,dy:aimState.dy})); } }
     }
@@ -1341,8 +1343,9 @@ function bindSkillBtn(id,k){
     clearTimeout(holdTimer);
     chargeState.active=false;
     if(wasChannel){ holding=false; aimState.active=false; if(ws.readyState===1)ws.send(JSON.stringify({t:'channelend',k:k})); return; }
-    if(holding){ holding=false; aimState.active=false;
-      if(dragged) cast(k,{dx:aimState.dx,dy:aimState.dy,mag:aimState.mag}); else cast(k);
+    if(holding){ holding=false; aimState.active=false; aimState.cancelZone=false;
+      if(dragged && nearCancel){ /* hủy hoàn toàn — không cast, không tốn mana, không hồi chiêu */ }
+      else if(dragged) cast(k,{dx:aimState.dx,dy:aimState.dy,mag:aimState.mag}); else cast(k);
     } else { cast(k); }
   }
   btn.addEventListener('pointerup',release);
@@ -1608,7 +1611,20 @@ function frame(now){
   if(aimState.active && meNow){
     var aimSk=null; var aimSid=myLoadout&&myLoadout[aimState.slot];
     for(var asi=0;asi<myFull.length;asi++){ if(myFull[asi].id===aimSid){ aimSk=myFull[asi]; break; } }
-    if(aimSk){
+    if(aimSk && aimSk.type==='arcanedet'){
+      var apx0=(myPX!==null?myPX:meNow.x), apy0=(myPY!==null?myPY:meNow.y);
+      var maxR0=aimSk.range||160;
+      var hax0=apx0+aimState.dx*maxR0*aimState.mag, hay0=apy0+aimState.dy*maxR0*aimState.mag;
+      var bestD0=32,bestX0=0,bestY0=0,bestR0=15,found0=false;
+      for(var heid0 in enemies){var he0=enemies[heid0]; if(he0.dead||he0.zone!==myZone)continue; var hd0=Math.hypot(he0.x-hax0,he0.y-hay0); if(hd0<bestD0){bestD0=hd0;bestX0=he0.x;bestY0=he0.y;bestR0=(he0.r||14)+6;found0=true;}}
+      for(var hpid0 in players){ if(hpid0==myId)continue; var ho0=players[hpid0]; if(!ho0.chosen||ho0.dead||ho0.zone!==myZone)continue; var hd1=Math.hypot(ho0.x-hax0,ho0.y-hay0); if(hd1<bestD0){bestD0=hd1;bestX0=ho0.x;bestY0=ho0.y;bestR0=21;found0=true;}}
+      ctx.save();ctx.globalAlpha=0.95;ctx.strokeStyle=found0?'#ffe070':'#ff6a5a';ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(hax0-17,hay0);ctx.lineTo(hax0-6,hay0);ctx.moveTo(hax0+6,hay0);ctx.lineTo(hax0+17,hay0);
+      ctx.moveTo(hax0,hay0-17);ctx.lineTo(hax0,hay0-6);ctx.moveTo(hax0,hay0+6);ctx.lineTo(hax0,hay0+17);ctx.stroke();
+      ctx.beginPath();ctx.arc(hax0,hay0,11,0,7);ctx.stroke();
+      ctx.restore();
+      if(found0){ ctx.save();ctx.globalAlpha=0.9;ctx.strokeStyle='#ffe070';ctx.lineWidth=3;ctx.beginPath();ctx.arc(bestX0,bestY0,bestR0,0,7);ctx.stroke();ctx.restore(); }
+    } else if(aimSk){
       var apx=(myPX!==null?myPX:meNow.x), apy=(myPY!==null?myPY:meNow.y);
       var maxR=aimSk.range||160, curR=maxR*aimState.mag;
       var tx2=apx+aimState.dx*curR, ty2=apy+aimState.dy*curR;
@@ -1627,10 +1643,9 @@ function frame(now){
       } else {
         ctx.beginPath();ctx.moveTo(apx,apy);ctx.lineTo(apx+aimState.dx*maxR,apy+aimState.dy*maxR);ctx.lineWidth=4;ctx.stroke();
       }
-      if(aimSk.type==='huntmark'||aimSk.type==='arcanedet'){
+      if(aimSk.type==='huntmark'){
         var hax=apx+aimState.dx*maxR*aimState.mag, hay=apy+aimState.dy*maxR*aimState.mag;
-        var snapR=(aimSk.type==='arcanedet')?32:60;
-        var bestD=snapR,bestX=0,bestY=0,bestR=15,found=false;
+        var bestD=60,bestX=0,bestY=0,bestR=15,found=false;
         for(var heid in enemies){var he=enemies[heid]; if(he.dead||he.zone!==myZone)continue; var hd=Math.hypot(he.x-hax,he.y-hay); if(hd<bestD){bestD=hd;bestX=he.x;bestY=he.y;bestR=(he.r||14)+6;found=true;}}
         for(var hpid in players){ if(hpid==myId)continue; var ho=players[hpid]; if(!ho.chosen||ho.dead||ho.zone!==myZone)continue; var hd2=Math.hypot(ho.x-hax,ho.y-hay); if(hd2<bestD){bestD=hd2;bestX=ho.x;bestY=ho.y;bestR=21;found=true;}}
         ctx.save();ctx.globalAlpha=0.85;ctx.strokeStyle=found?'#ffe070':'#ff5a5a';ctx.lineWidth=2;
@@ -1653,9 +1668,18 @@ function frame(now){
 
   if(aimState.active){
     var ex=aimState.ox+aimState.dx*aimState.mag*AIM_MAX_PX, ey=aimState.oy+aimState.dy*aimState.mag*AIM_MAX_PX;
-    ctx.save();ctx.globalAlpha=.85;ctx.fillStyle='#ff9a4a';ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.fill();
-    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.stroke();
-    ctx.restore();
+    if(aimState.cancelZone){
+      ctx.save();ctx.globalAlpha=.9;ctx.fillStyle='#ff3a3a';ctx.beginPath();ctx.arc(aimState.ox,aimState.oy,26,0,7);ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(aimState.ox-9,aimState.oy-9);ctx.lineTo(aimState.ox+9,aimState.oy+9);
+      ctx.moveTo(aimState.ox+9,aimState.oy-9);ctx.lineTo(aimState.ox-9,aimState.oy+9);ctx.stroke();
+      ctx.font='bold 13px Trebuchet MS';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText('Hủy',aimState.ox,aimState.oy-34);
+      ctx.restore();
+    } else {
+      ctx.save();ctx.globalAlpha=.85;ctx.fillStyle='#ff9a4a';ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(ex,ey,8,0,7);ctx.stroke();
+      ctx.restore();
+    }
   }
   if(chargeState.active){
     var held=performance.now()-chargeState.startT;
@@ -1941,11 +1965,11 @@ const SKILLS = {
     {id:'m8',name:'Hút Hồn',    icon:'💜',type:'lifesteal',mp:20,cd:4,unlockLv:20,range:380,dmg:34,lsPct:0.55, reqStat:'INT',reqVal:20,scaleKey:'dmg',
       desc:'Đòn phép tầm xa, hồi máu bằng 55% sát thương gây ra. Nhánh Hút Máu (cần Trí Tuệ cao).'},
     {id:'m9',name:'Vọng Thời Gian',icon:'⏳',type:'timeecho', mp:18,cd:16,  unlockLv:23, dur:5,comboNext:true,comboMaxStep:2,comboWindow:5000,maxDist:500,aoeDmg:22,aoeR:70,scaleKey:'aoeDmg',
-      desc:'Lần 1: ghi lại vị trí hiện tại (tự cast tại chỗ, không cần ngắm). Bấm lại trong 5s (còn cách chỗ ghi tối đa 500): DỊCH CHUYỂN NGAY VỀ đúng vị trí đã ghi + gây 1 đợt sát thương nhỏ quanh mình lúc xuất hiện (dư chấn thời gian).'},
+      desc:'Lần 1: ghi lại vị trí hiện tại (tự cast tại chỗ, không cần ngắm). Trong 5s đó bạn VẪN dùng được các skill khác bình thường (vd Bước Ảnh để cơ động ra xa) — bấm lại Vọng Thời Gian bất cứ lúc nào trong 5s (còn cách chỗ ghi tối đa 500): DỊCH CHUYỂN NGAY VỀ + gây 1 đợt sát thương nhỏ quanh mình (dư chấn thời gian).'},
     {id:'m10',name:'Vực Hút Trọng Lực',icon:'🌀',type:'gravitywell', mp:30,cd:12, unlockLv:26, range:300,radius:130,life:2.5,pullSpd:40,dmg:8,
       desc:'Tạo 1 vùng hút tại vị trí ngắm, tồn tại 2.5s — kẻ địch trong vùng bị kéo dần vào tâm + chịu sát thương nhỏ liên tục. Không mạnh nhưng GOM địch lại để tận dụng Tia Diệt Vong/Dây Huyền Bí ngay sau đó.'},
     {id:'m11',name:'Phong Ấn Huyền Bí',icon:'🔮',type:'arcanedet', mp:20,cd:8, unlockLv:29, range:400,dur:6,bonusPct:0.5,
-      desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đóng dấu (nhắm hụt sẽ không trúng ai). Không gây sát thương ngay — đòn phép TIẾP THEO của bạn đánh trúng nó sẽ được +50% sát thương và tiêu luôn dấu. Quan trọng cho PK — chọn đúng mục tiêu, không tự nhắm bừa.'},
+      desc:'GIỮ để hiện hồng tâm riêng tư, KÉO TỰ DO trong tầm ngắm tới đúng mục tiêu (sáng vàng khi đã khóa đúng) rồi thả tay — không gây sát thương ngay. Đòn phép TIẾP THEO đánh trúng mục tiêu đã đóng dấu sẽ +50% sát thương và tiêu luôn dấu. Chọn chuẩn xác tuyệt đối — quan trọng cho PK.'},
     {id:'m12',name:'Chuyển Hệ',  icon:'♻️',type:'elemshift', mp:10,cd:5, unlockLv:32,
       desc:'Chủ động đổi hệ Nguyên Tố hiện tại sang hệ TIẾP THEO trong vòng Lửa→Băng→Huyền Bí→Lửa — dùng để tự tạo phản ứng combo mà không cần đổi skill, tốn ít mana, hồi chiêu ngắn.'},
   ],
@@ -2052,7 +2076,7 @@ function doSkill(id,k,aim){
     p.comboState={skillId:sid,slot:k,step:curStep,expireAt:Date.now()+(sk.comboWindow||600)};
     sendTo(id,{t:'combo',active:true,slot:k,windowMs:sk.comboWindow||600});
   } else {
-    p.comboState=null;
+    if(p.comboState && p.comboState.skillId===sid) p.comboState=null; // chỉ xóa combo CỦA CHÍNH skill này, không đụng combo skill khác đang chờ
     p.cd[k]=Math.max(0.3,sk.cd-(p.INT||0)*0.02);
     sendTo(id,{t:'skillcd',slot:k,dur:p.cd[k]});
   }
@@ -3115,4 +3139,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.69 (hồng tâm chuẩn xác + fix party + AOE Vọng TG) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.70 (hồng tâm thuần + combo xen kẽ + hủy skill) chạy ở cổng '+PORT));
