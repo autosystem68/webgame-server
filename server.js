@@ -614,7 +614,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.75 · Xung Phong đuổi mục tiêu + báo cooldown</div>
+  <div id="ver">v0.76 · sửa kéo-thả nhanh bị bỏ qua</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1352,19 +1352,17 @@ var AIMABLE_TYPES={dash:1,warcleave:1,predstep:1,groundbreak:1,pierce:1,huntmark
 function isAimable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!AIMABLE_TYPES[myFull[i].type]; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
-  var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,wasAimable=false,lastAimSendT=0,nearCancel=false;
+  var holding=false,startX=0,startY=0,dragged=false,wasCharge=false,wasChannel=false,wasAimable=false,lastAimSendT=0,nearCancel=false;
   btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
     if(cd[k]>0){ flash(k); return; }
-    startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;nearCancel=false;
+    startX=ev.clientX;startY=ev.clientY;dragged=false;nearCancel=false;
     try{btn.setPointerCapture(ev.pointerId);}catch(e){}
     wasCharge=isChargeable(k); wasChannel=isChannelable(k); wasAimable=isAimable(k);
     if(wasCharge){ if(ws.readyState===1)ws.send(JSON.stringify({t:'chargestart',k:k})); chargeState.active=true;chargeState.slot=k;chargeState.startT=performance.now(); }
     if(wasChannel){ if(ws.readyState===1)ws.send(JSON.stringify({t:'channelstart',k:k})); }
-    holdTimer=setTimeout(function(){
-      holding=true;
-      if(wasAimable||wasCharge||wasChannel){ aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;aimState.cancelZone=false; }
-      cancelHover.active=true; cancelHover.cancelZone=false;
-    },(wasCharge||wasChannel)?0:160);
+    holding=true;
+    if(wasAimable||wasCharge||wasChannel){ aimState.active=true;aimState.slot=k;aimState.dx=0;aimState.dy=1;aimState.mag=0;aimState.ox=startX;aimState.oy=startY;aimState.cancelZone=false; }
+    cancelHover.active=true; cancelHover.cancelZone=false;
   });
   btn.addEventListener('pointermove',function(ev){
     if(!holding)return;
@@ -1382,7 +1380,6 @@ function bindSkillBtn(id,k){
     }
   });
   function release(ev){
-    clearTimeout(holdTimer);
     chargeState.active=false; cancelHover.active=false;
     if(wasChannel){ holding=false; aimState.active=false; if(ws.readyState===1)ws.send(JSON.stringify({t:'channelend',k:k})); return; }
     if(holding){ holding=false; aimState.active=false; aimState.cancelZone=false;
@@ -1392,7 +1389,7 @@ function bindSkillBtn(id,k){
     } else { cast(k); }
   }
   btn.addEventListener('pointerup',release);
-  btn.addEventListener('pointercancel',function(){clearTimeout(holdTimer);holding=false;aimState.active=false;chargeState.active=false;cancelHover.active=false; if(wasChannel && ws.readyState===1)ws.send(JSON.stringify({t:'channelend',k:k}));});
+  btn.addEventListener('pointercancel',function(){holding=false;aimState.active=false;chargeState.active=false;cancelHover.active=false; if(wasChannel && ws.readyState===1)ws.send(JSON.stringify({t:'channelend',k:k}));});
 }
 bindBtn('sB','b');bindSkillBtn('sQ','q');bindSkillBtn('sW','w');bindSkillBtn('sE','e');bindSkillBtn('sR','r');
 
@@ -3378,4 +3375,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.75 (Xung Phong đuổi mục tiêu + báo cooldown) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.76 (sửa kéo-thả nhanh bị bỏ qua) chạy ở cổng '+PORT));
