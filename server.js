@@ -66,9 +66,11 @@ function tickSummon(p,id,dt){
   s.expireT-=dt; if(s.expireT<=0){ p.summon=null; sendTo(id,{t:'toast',text:'Cấm Vệ Quân đã hết hạn triệu hồi.'}); return; }
   if(s.zone!==p.zone){ s.zone=p.zone; s.x=p.x; s.y=p.y; s.orderPhase=null; }
   if(s.orderPhase==='charge'){
+    if(s.orderTargetId){ const tgt=enemies[s.orderTargetId]; if(tgt && !tgt.dead){ s.orderX=tgt.x; s.orderY=tgt.y; } else { s.orderTargetId=null; } }
+    s.chargeT=(s.chargeT||0)+dt;
     const d=Math.hypot(s.orderX-s.x,s.orderY-s.y);
-    if(d>12){ s.x+=(s.orderX-s.x)/d*260*dt; s.y+=(s.orderY-s.y)/d*260*dt; summonSweep(s,id); }
-    else { s.orderPhase='hold'; s.orderHoldT=s.orderHoldDurV||2.5; s.sweepHit=null; fxEv('ring',s.x,s.y,45,0,0,45); }
+    if(d>12 && s.chargeT<4){ s.x+=(s.orderX-s.x)/d*260*dt; s.y+=(s.orderY-s.y)/d*260*dt; summonSweep(s,id); }
+    else { s.orderPhase='hold'; s.orderHoldT=s.orderHoldDurV||2.5; s.sweepHit=null; s.chargeT=0; fxEv('ring',s.x,s.y,45,0,0,45); }
   } else if(s.orderPhase==='hold'){
     s.orderHoldT-=dt;
     if(s.orderHoldT<=0){ s.orderPhase='return'; s.sweepHit=null; }
@@ -612,7 +614,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.74 · fix Dấu Quạ + Xung Phong lao-đánh-về</div>
+  <div id="ver">v0.75 · Xung Phong đuổi mục tiêu + báo cooldown</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1352,7 +1354,7 @@ function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
   var holding=false,startX=0,startY=0,holdTimer=null,dragged=false,wasCharge=false,wasChannel=false,wasAimable=false,lastAimSendT=0,nearCancel=false;
   btn.addEventListener('pointerdown',function(ev){ev.preventDefault();ev.stopPropagation();
-    if(cd[k]>0)return;
+    if(cd[k]>0){ flash(k); return; }
     startX=ev.clientX;startY=ev.clientY;holding=false;dragged=false;nearCancel=false;
     try{btn.setPointerCapture(ev.pointerId);}catch(e){}
     wasCharge=isChargeable(k); wasChannel=isChannelable(k); wasAimable=isAimable(k);
@@ -2189,7 +2191,7 @@ const SKILLS = {
     {id:'c9',name:'Xích Kéo',   icon:'🔗',type:'pull', mp:24,cd:9,   unlockLv:12, range:260,dmg:20,pullDist:150,authCost:50},
     {id:'c10',name:'Lệnh Tấn Công',icon:'📯',type:'command',mp:35,cd:16,unlockLv:18, radius:200,atkBonus:0.3,dur:6,authCost:60},
     {id:'c11',name:'Lệnh: Xung Phong',icon:'🐎',type:'cmdadvance', mp:20,cd:11, unlockLv:23, range:320,orderRange:320,orderHoldDur:2.5,authCost:20,sweepDmg:14,sweepR:55,
-      desc:'GIỮ rồi kéo tới điểm muốn ra lệnh (giới hạn theo khoảng cách TỪ CHÍNH Cấm Vệ Quân, không phải từ bạn). Cấm Vệ Quân LAO NHANH tới đó — trên đường lao đi gây sát thương cho mọi địch trên đường. Tới nơi: đứng lại 2.5s với giáo DÀI HƠN + đánh nhanh hơn hẳn. Hết giờ: LAO VỀ lại phía bạn — trên đường về TIẾP TỤC gây sát thương dọc đường.'},
+      desc:'GIỮ rồi kéo tới điểm muốn ra lệnh (giới hạn theo khoảng cách TỪ CHÍNH Cấm Vệ Quân, không phải từ bạn) — nhắm TRÚNG 1 kẻ địch thì Cấm Vệ Quân sẽ ĐUỔI THEO nó dù nó di chuyển, nhắm vị trí trống thì lao thẳng tới đó. Trên đường lao đi gây sát thương mọi địch chạm phải. Tới nơi: đứng lại 2.5s với giáo DÀI HƠN + đánh nhanh hơn hẳn. Hết giờ: LAO VỀ lại phía bạn — trên đường về TIẾP TỤC gây sát thương.'},
     {id:'c12',name:'Cờ Hiệu Đế Vương',icon:'🚩',type:'banner', mp:38,cd:18, unlockLv:29, range:260,radius:150,life:8,atkBuf:0.15,defBuf:0.12,authCost:15,
       desc:'GIỮ rồi kéo tới vị trí đặt cờ — cờ hạ xuống từ trên trời, cắm đất có bụi bay (khác hẳn nhịp nhanh của Xung Phong). Tồn tại 8s — đồng đội (kể cả Cấm Vệ Quân/pet) đứng trong vùng được +15% sát thương, +12% giảm dame nhận.'},
   ],
@@ -2603,7 +2605,10 @@ function execSkill(p,id,sk,rank,step){
     const distFromSummon=Math.hypot(ox-sox,oy-soy);
     const orderRange=sk.orderRange||sk.range;
     if(distFromSummon>orderRange){ const sc=orderRange/distFromSummon; ox=sox+(ox-sox)*sc; oy=soy+(oy-soy)*sc; }
-    p.summon.orderX=ox; p.summon.orderY=oy; p.summon.orderPhase='charge';
+    let lockId=null,best=50;
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ox,e.y-oy); if(d<best){best=d;lockId=eid;}}
+    if(lockId){ ox=enemies[lockId].x; oy=enemies[lockId].y; }
+    p.summon.orderX=ox; p.summon.orderY=oy; p.summon.orderPhase='charge'; p.summon.orderTargetId=lockId;
     p.summon.orderHoldDurV=sk.orderHoldDur||2.5; p.summon.sweepDmgV=(sk.sweepDmg+POW(p)*0.3); p.summon.sweepRV=sk.sweepR||55;
     p.summon.sweepHit=null;
     fxEv('orderflag',ox,oy,45,sox,soy,0);
@@ -3373,4 +3378,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.74 (fix Dấu Quạ + Xung Phong lao-đánh-về) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.75 (Xung Phong đuổi mục tiêu + báo cooldown) chạy ở cổng '+PORT));
