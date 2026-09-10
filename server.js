@@ -591,7 +591,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.72 · Thống Lĩnh: Dấu Quạ + Xung Phong + Cờ Hiệu</div>
+  <div id="ver">v0.73 · 3 skill Cmd có hiệu ứng riêng biệt</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1250,7 +1250,7 @@ ws.onmessage=function(e){
   else if(m.t==='combo'){ comboPrompt.active=m.active; comboPrompt.slot=m.slot; comboPrompt.until=performance.now()+(m.windowMs||600); }
   else if(m.t==='echomark'){ if(m.active){ echoMark.active=true; echoMark.x=m.x; echoMark.y=m.y; echoMark.zone=m.zone; echoMark.maxDist=m.maxDist; echoMark.until=performance.now()+(m.windowMs||5000); } else { echoMark.active=false; } }
   else if(m.t==='skillcd'){ cd[m.slot]=m.dur; comboPrompt.active=false; }
-  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:0.4));
+  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:(m.kind==='raven'?0.55:(m.kind==='orderflag'?0.5:(m.kind==='plantflag'?0.8:0.4)))));
     fx.push({kind:m.kind,x:m.x,y:m.y,fx:m.fx,fy:m.fy,hue:m.hue,R:m.R||60,life:lf,max:lf});
     if(m.kind==='ring')shake=Math.max(shake,14); if(m.kind==='nova')shake=Math.max(shake,7);
     if(m.kind==='bigswing')shake=Math.max(shake,m.hue===5?22:(m.hue===12?16:8)); }
@@ -1491,6 +1491,67 @@ function frame(now){
           ctx.beginPath();ctx.arc(f.x,f.y,(f.R||40)*Math.min(1,(fall-0.65)/0.35),0,7);ctx.stroke(); }
       }
     }
+    else if(f.kind==='raven'){
+      var rt=Math.min(1,t/0.75);
+      if(t<0.75){
+        var rx=f.fx+(f.x-f.fx)*rt, ry=f.fy+(f.y-f.fy)*rt-Math.sin(rt*Math.PI)*40;
+        var wingFlap=Math.sin(performance.now()/55)*0.2;
+        ctx.save();ctx.globalAlpha=(f.life/f.max);ctx.translate(rx,ry);ctx.rotate(wingFlap);
+        ctx.font='18px serif';ctx.textAlign='center';ctx.fillText('🐦‍⬛',0,0);
+        ctx.restore();
+      } else {
+        var land=(t-0.75)/0.25;
+        ctx.save();ctx.globalAlpha=(f.life/f.max);
+        ctx.strokeStyle='#3a3a3a';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(f.x,f.y,8+land*20,0,7);ctx.stroke();
+        ctx.font='16px serif';ctx.textAlign='center';ctx.fillText('🐦‍⬛',f.x,f.y+5);
+        ctx.restore();
+      }
+    }
+    else if(f.kind==='plantflag'){
+      if(t<0.5){
+        var dt2=t/0.5;
+        var dropY=f.y-90*(1-dt2);
+        var sway=Math.sin(dt2*Math.PI*3)*10*(1-dt2);
+        ctx.save();ctx.globalAlpha=(f.life/f.max);
+        ctx.strokeStyle='#8a6a2a';ctx.lineWidth=3;
+        ctx.beginPath();ctx.moveTo(f.x+sway,dropY+18);ctx.lineTo(f.x+sway,dropY-16);ctx.stroke();
+        ctx.fillStyle='#ffd76b';ctx.beginPath();ctx.moveTo(f.x+sway,dropY-16);ctx.lineTo(f.x+sway+20,dropY-10);ctx.lineTo(f.x+sway,dropY-4);ctx.closePath();ctx.fill();
+        ctx.restore();
+      } else {
+        var plant=(t-0.5)/0.5;
+        ctx.save();ctx.globalAlpha=(f.life/f.max);
+        ctx.strokeStyle='#8a6a2a';ctx.lineWidth=3;
+        ctx.beginPath();ctx.moveTo(f.x,f.y+18);ctx.lineTo(f.x,f.y-16);ctx.stroke();
+        ctx.fillStyle='#ffd76b';ctx.beginPath();ctx.moveTo(f.x,f.y-16);ctx.lineTo(f.x+20,f.y-10);ctx.lineTo(f.x,f.y-4);ctx.closePath();ctx.fill();
+        ctx.globalAlpha=(f.life/f.max)*(1-plant)*0.7;
+        ctx.fillStyle='#c9a86a';
+        for(var pi=0;pi<5;pi++){ var pang=pi*1.25;
+          ctx.beginPath();ctx.arc(f.x+Math.cos(pang)*plant*16,f.y+18+Math.sin(pang)*plant*6,3,0,7);ctx.fill(); }
+        ctx.globalAlpha=(f.life/f.max)*0.35;
+        ctx.strokeStyle='#ffd76b';ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.arc(f.x,f.y,(f.R||150)*plant,0,7);ctx.stroke();
+        ctx.restore();
+      }
+    }
+    else if(f.kind==='orderflag'){
+      var ot=Math.min(1,t/0.35);
+      if(t<0.35){
+        var ox2=f.fx+(f.x-f.fx)*ot, oy2=f.fy+(f.y-f.fy)*ot;
+        var oa=Math.atan2(f.y-f.fy,f.x-f.fx);
+        ctx.save();ctx.globalAlpha=(f.life/f.max);ctx.translate(ox2,oy2);ctx.rotate(oa);
+        ctx.fillStyle='#ffcf6b';ctx.beginPath();ctx.moveTo(16,0);ctx.lineTo(-8,-9);ctx.lineTo(-3,0);ctx.lineTo(-8,9);ctx.closePath();ctx.fill();
+        ctx.restore();
+      } else {
+        var stamp=(t-0.35)/0.65;
+        ctx.save();ctx.globalAlpha=(f.life/f.max)*(1-stamp*0.5);
+        ctx.strokeStyle='#ffcf6b';ctx.lineWidth=3;
+        ctx.beginPath();ctx.arc(f.x,f.y,10+stamp*35,0,7);ctx.stroke();
+        for(var oi=0;oi<4;oi++){ var oang=oi*1.57+0.4;
+          ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(f.x+Math.cos(oang)*(12+stamp*22),f.y+Math.sin(oang)*(12+stamp*22));ctx.stroke(); }
+        ctx.restore();
+      }
+    }
     else if(f.kind==='swing'){ctx.strokeStyle='#ffd9a0';ctx.lineWidth=5;var a=Math.atan2(f.fy,f.fx);
       ctx.beginPath();ctx.arc(f.x,f.y,26,a-0.9,a+0.9);ctx.stroke();}
     else if(f.kind==='bigswing'){
@@ -1649,7 +1710,36 @@ function frame(now){
   if(aimState.active && meNow){
     var aimSk=null; var aimSid=myLoadout&&myLoadout[aimState.slot];
     for(var asi=0;asi<myFull.length;asi++){ if(myFull[asi].id===aimSid){ aimSk=myFull[asi]; break; } }
-    if(aimSk && (aimSk.type==='arcanedet'||aimSk.type==='blooddebt'||aimSk.type==='warlordverdict')){
+    if(aimSk && aimSk.type==='cmdadvance'){
+      var apxC=(myPX!==null?myPX:meNow.x), apyC=(myPY!==null?myPY:meNow.y);
+      var maxRC=aimSk.range||160;
+      var oxC=apxC+aimState.dx*maxRC*aimState.mag, oyC=apyC+aimState.dy*maxRC*aimState.mag;
+      var mySum=mySummons[myId];
+      var hasSum=!!(mySum && mySum.zone===myZone);
+      var sx=hasSum?mySum.x:apxC, sy=hasSum?mySum.y:apyC;
+      ctx.save();ctx.globalAlpha=0.5;ctx.strokeStyle=hasSum?'#ffcf6b':'#888';ctx.lineWidth=2;ctx.setLineDash([3,7]);
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(oxC,oyC);ctx.stroke();ctx.setLineDash([]);
+      ctx.globalAlpha=0.9;
+      var fa=Math.atan2(oyC-sy,oxC-sx);
+      ctx.save();ctx.translate(oxC,oyC);ctx.rotate(fa);
+      ctx.fillStyle=hasSum?'#ffcf6b':'#888';
+      ctx.beginPath();ctx.moveTo(14,0);ctx.lineTo(-6,-9);ctx.lineTo(-6,9);ctx.closePath();ctx.fill();
+      ctx.restore();
+      if(!hasSum){ ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillStyle='#ff8a5a';ctx.fillText('Cần triệu hồi Cấm Vệ Quân trước',oxC,oyC-24); }
+      ctx.restore();
+    } else if(aimSk && aimSk.type==='banner'){
+      var apxB=(myPX!==null?myPX:meNow.x), apyB=(myPY!==null?myPY:meNow.y);
+      var maxRB=aimSk.range||160;
+      var bxB=apxB+aimState.dx*maxRB*aimState.mag, byB=apyB+aimState.dy*maxRB*aimState.mag;
+      ctx.save();ctx.globalAlpha=0.18;ctx.fillStyle='#ffd76b';ctx.beginPath();ctx.arc(bxB,byB,aimSk.radius||150,0,7);ctx.fill();
+      ctx.globalAlpha=0.5;ctx.strokeStyle='#ffd76b';ctx.lineWidth=2;ctx.setLineDash([5,5]);
+      ctx.beginPath();ctx.arc(bxB,byB,aimSk.radius||150,0,7);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(apxB,apyB);ctx.lineTo(bxB,byB);ctx.stroke();ctx.setLineDash([]);
+      ctx.globalAlpha=0.95;ctx.strokeStyle='#8a6a2a';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(bxB,byB+16);ctx.lineTo(bxB,byB-14);ctx.stroke();
+      ctx.fillStyle='#ffd76b';ctx.beginPath();ctx.moveTo(bxB,byB-14);ctx.lineTo(bxB+16,byB-9);ctx.lineTo(bxB,byB-4);ctx.closePath();ctx.fill();
+      ctx.restore();
+    } else if(aimSk && (aimSk.type==='arcanedet'||aimSk.type==='blooddebt'||aimSk.type==='warlordverdict')){
       var apx0=(myPX!==null?myPX:meNow.x), apy0=(myPY!==null?myPY:meNow.y);
       var maxR0=aimSk.range||160;
       ctx.save();ctx.globalAlpha=0.22;ctx.strokeStyle='#ffb060';ctx.lineWidth=1.5;ctx.setLineDash([4,6]);
@@ -2051,7 +2141,7 @@ const SKILLS = {
   cmd: [
     {id:'c1',name:'Lướt',       icon:'💨',type:'dash', mp:10,cd:2.2, unlockLv:2,  dist:150},
     {id:'c2',name:'Dấu Quạ',    icon:'🐦‍⬛',type:'ravenmark', mp:14,cd:8,   unlockLv:3,  range:260,dur:8,bonusPct:0.15,
-      desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đánh dấu (nhắm hụt không trúng ai). Cấm Vệ Quân/pet ƯU TIÊN tuyệt đối tấn công mục tiêu này, đòn của chúng lên nó +25% dame. Đòn của chính bạn lên nó cũng +15%.'},
+      desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đánh dấu (nhắm hụt không trúng ai). 1 con quạ thật bay từ bạn tới đích rồi đáp xuống đóng dấu. Cấm Vệ Quân/pet ƯU TIÊN tuyệt đối tấn công mục tiêu này, đòn của chúng lên nó +25% dame. Đòn của chính bạn lên nó cũng +15%.'},
     {id:'c3',name:'Chữa Trị',   icon:'💚',type:'heal', mp:30,cd:7,   unlockLv:5,  radius:165,heal:60, authGain:12, reqStat:'INT',reqVal:10},
     {id:'c4',name:'Uy Lệnh',    icon:'👑',type:'summon', mp:55,cd:20,  unlockLv:7,  dur:20,atk:18,spdmul:1.2,radius:170,dmg:32, authGain:18},
     {id:'c5',name:'Giáp Hộ Vệ', icon:'🛡️',type:'shield',mp:26,cd:10,unlockLv:10, amount:55,dur:5,radius:160, authGain:10},
@@ -2061,9 +2151,9 @@ const SKILLS = {
     {id:'c9',name:'Xích Kéo',   icon:'🔗',type:'pull', mp:24,cd:9,   unlockLv:12, range:260,dmg:20,pullDist:150,authCost:50},
     {id:'c10',name:'Lệnh Tấn Công',icon:'📯',type:'command',mp:35,cd:16,unlockLv:18, radius:200,atkBonus:0.3,dur:6,authCost:60},
     {id:'c11',name:'Lệnh: Xung Phong',icon:'🐎',type:'cmdadvance', mp:20,cd:11, unlockLv:23, range:320,orderDur:3.5,authCost:20,
-      desc:'GIỮ rồi kéo tới điểm muốn ra lệnh — Cấm Vệ Quân LẬP TỨC lao nhanh tới đó (không phải bạn tự đánh), trong 3.5s tấn công nhanh hơn hẳn. Cần đã triệu hồi Cấm Vệ Quân (Uy Lệnh) trước. Cốt lõi triết lý Thống Lĩnh — sức mạnh nằm ở điều khiển, không phải tự đánh.'},
+      desc:'GIỮ rồi kéo tới điểm muốn ra lệnh — đường ngắm xuất phát từ CHÍNH Cấm Vệ Quân (không phải từ bạn). 1 mũi tên lệnh vàng lao thẳng cắm xuống đích, Cấm Vệ Quân lập tức lao nhanh tới đó, trong 3.5s tấn công nhanh hơn hẳn. Cần đã triệu hồi Cấm Vệ Quân (Uy Lệnh) trước.'},
     {id:'c12',name:'Cờ Hiệu Đế Vương',icon:'🚩',type:'banner', mp:38,cd:18, unlockLv:29, range:260,radius:150,life:8,atkBuf:0.15,defBuf:0.12,authCost:15,
-      desc:'GIỮ rồi kéo tới vị trí đặt cờ (tồn tại 8s) — đồng đội (kể cả Cấm Vệ Quân/pet) đứng trong vùng được +15% sát thương, +12% giảm dame nhận. Vị trí chiến thuật — đặt đúng chỗ combat sắp diễn ra.'},
+      desc:'GIỮ rồi kéo tới vị trí đặt cờ — cờ hạ xuống từ trên trời, cắm đất có bụi bay (khác hẳn nhịp nhanh của Xung Phong). Tồn tại 8s — đồng đội (kể cả Cấm Vệ Quân/pet) đứng trong vùng được +15% sát thương, +12% giảm dame nhận.'},
   ],
 };
 // ---- PASSIVE nội tại riêng từng class (LOL-signature style) ----
@@ -2463,23 +2553,23 @@ function execSkill(p,id,sk,rank,step){
       for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
       if(bestEnt) hit={ent:bestEnt,tp:bestTp};
     } else hit=nearestHostile(p,id,sk.range);
-    if(hit){ addStatus(hit.ent,'ravenmark',{dur:sk.dur,data:{bonus:sk.bonusPct}}); fxEv('ring',hit.ent.x,hit.ent.y,45,0,0,30); }
+    if(hit){ addStatus(hit.ent,'ravenmark',{dur:sk.dur,data:{bonus:sk.bonusPct}}); fxEv('raven',hit.ent.x,hit.ent.y,45,p.x,p.y,0); }
   }
   else if(sk.type==='cmdadvance'){
     if(!p.summon){ sendTo(id,{t:'toast',text:'Cần triệu hồi Cấm Vệ Quân (Uy Lệnh) trước khi ra lệnh xung phong'}); return; }
     if((p.authority||0)<sk.authCost)return; p.authority-=sk.authCost;
     const rng=sk.range*(p.aimMag||1);
     const ox=p.x+p.fx*rng, oy=p.y+p.fy*rng;
+    const sox=p.summon.x, soy=p.summon.y;
     p.summon.orderX=ox; p.summon.orderY=oy; p.summon.orderT=sk.orderDur;
-    fxEv('ring',ox,oy,45,0,0,30);
-    fxEv('dash',p.summon.x,p.summon.y,45,0,0,0);
+    fxEv('orderflag',ox,oy,45,sox,soy,0);
   }
   else if(sk.type==='banner'){
     if((p.authority||0)<sk.authCost)return; p.authority-=sk.authCost;
     const rng=sk.range*(p.aimMag||1);
     const bx=p.x+p.fx*rng, by=p.y+p.fy*rng;
     banners.push({x:bx,y:by,zone:p.zone,radius:sk.radius,life:sk.life,atkBuf:sk.atkBuf,defBuf:sk.defBuf,owner:id});
-    fxEv('ring',bx,by,45,0,0,sk.radius);
+    fxEv('plantflag',bx,by,45,0,0,sk.radius);
   }
   else if(sk.type==='cone'){
     let fbonus=1;
@@ -3239,4 +3329,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.72 (Thống Lĩnh: Dấu Quạ + Xung Phong + Cờ Hiệu) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.73 (3 skill Cmd có hiệu ứng riêng biệt) chạy ở cổng '+PORT));
