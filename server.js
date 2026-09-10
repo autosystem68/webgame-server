@@ -614,7 +614,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.76 · sửa kéo-thả nhanh bị bỏ qua</div>
+  <div id="ver">v0.77 · sửa im lặng thiếu Uy Quyền</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1195,6 +1195,7 @@ ws.onmessage=function(e){
     document.getElementById('npcPanel').style.display='flex'; renderNpcPanel(); }
   else if(m.t==='shopdata'){ mySh=m; document.getElementById('shopPanel').style.display='flex'; renderShop(); }
   else if(m.t==='toast'){ var tt=document.getElementById('toastTxt'); tt.textContent=m.text; tt.style.opacity=1;
+    if(m.flashSlot) flash(m.flashSlot);
     setTimeout(function(){tt.style.opacity=0;},2600); }
   else if(m.t==='dungeon'){ document.getElementById('dglbl').textContent='🎫 Vé Mật Thất: '+m.entries+'/'+m.max; }
   else if(m.t==='state'){
@@ -2227,7 +2228,7 @@ function doSkill(id,k,aim){
   const isRecast = !!(sk.comboNext && p.comboState && p.comboState.skillId===sid && p.comboState.expireAt>Date.now());
   if(!isRecast){
     if(p.cd[k]>0 || p.mp<sk.mp)return;
-    if(sk.authCost && (p.authority||0)<sk.authCost)return;
+    if(sk.authCost && (p.authority||0)<sk.authCost){ sendTo(id,{t:'toast',text:'Không đủ Uy Quyền ('+Math.floor(p.authority||0)+'/'+sk.authCost+')',flashSlot:k}); return; }
     if(sk.hpReq && (p.hp/p.maxhp)>sk.hpReq)return;
   }
   if(aim && typeof aim.dx==='number' && typeof aim.dy==='number'){
@@ -3375,4 +3376,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.76 (sửa kéo-thả nhanh bị bỏ qua) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.77 (sửa im lặng thiếu Uy Quyền) chạy ở cổng '+PORT));
