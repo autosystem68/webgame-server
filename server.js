@@ -614,7 +614,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.79 · Sắc Lệnh Quân Đoàn (ultimate Cmd)</div>
+  <div id="ver">v0.80 · /set admin linh hoạt (lv 99)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -3039,7 +3039,7 @@ function doChat(p,id,text){
   if(typeof text!=='string')return; text=text.trim().slice(0,120); if(!text)return;
   if(text==='/admin'){
     p.gold=(p.gold||0)+99999; p.stones=(p.stones||0)+999;
-    const target=30;
+    const target=99;
     if(p.lv<target){
       const add=target-p.lv; p.lv=target;
       p.statPts=(p.statPts||0)+add*3; p.skillPts=(p.skillPts||0)+add;
@@ -3049,6 +3049,7 @@ function doChat(p,id,text){
       p.pet={type:pt.id,lv:5,xp:0,xpNext:100,atk:bs.atk,fullness:100,x:p.x,y:p.y,zone:p.zone}; }
     if(!p.hspet){ p.hspet={stat:{STR:40,VIT:40,AGI:40,INT:40},hunger:100}; } else { p.hspet.hunger=100; }
     if(!p.mounts||!p.mounts.length){ p.mounts=['dragon']; p.mounted='dragon'; }
+    p.authority=100;
     recompute(p); p.hp=p.maxhp; p.mp=p.maxmp;
     p.dungeonEntries=DUNGEON_MAX_ENTRIES;
     sendInv(p,id);
@@ -3057,6 +3058,33 @@ function doChat(p,id,text){
     sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
     bcast({t:'level',id,lv:p.lv,x:p.x,y:p.y}); // CHỈ 1 lần duy nhất, không lặp qua gainXP (tránh dồn dập hiệu ứng gây đứng máy)
     sendTo(id,{t:'toast',text:'🛠️ Admin: Lv '+p.lv+' + tài nguyên + Đệ Tử/Thú Cưng/Thú Cưỡi đầy đủ để test.'});
+    return;
+  }
+  if(text.startsWith('/set ')){
+    const parts=text.slice(5).trim().split(/\s+/);
+    if(parts.length>=2){
+      const field=parts[0], val=Number(parts[1]);
+      if(!isNaN(val)){
+        if(field==='lv'){
+          const target=Math.max(1,Math.min(99,Math.round(val)));
+          if(target>p.lv){ const add=target-p.lv; p.lv=target; p.statPts=(p.statPts||0)+add*3; p.skillPts=(p.skillPts||0)+add;
+            let xn=p.xpNext||100; for(let i=0;i<add;i++)xn=Math.round(xn*1.35); p.xpNext=xn; }
+          else { p.lv=target; }
+          recompute(p); p.hp=p.maxhp; p.mp=p.maxmp;
+          bcast({t:'level',id,lv:p.lv,x:p.x,y:p.y});
+          sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout});
+        } else {
+          p[field]=val;
+          if(field==='STR'||field==='VIT'||field==='AGI'||field==='INT') recompute(p);
+          if(field==='hp')p.hp=Math.min(p.hp,p.maxhp);
+          if(field==='mp')p.mp=Math.min(p.mp,p.maxmp);
+        }
+        sendInv(p,id);
+        sendTo(id,{t:'toast',text:'🛠️ Set '+field+' = '+val});
+      } else {
+        sendTo(id,{t:'toast',text:'Cú pháp: /set <tên_field> <số> — vd /set gold 99999, /set lv 99, /set authority 100'});
+      }
+    }
     return;
   }
   bcast({t:'chatmsg',id,cls:p.cls,text,channel:'world'});
@@ -3407,4 +3435,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.79 (Sắc Lệnh Quân Đoàn ultimate Cmd) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.80 (/set admin linh hoạt lv 99) chạy ở cổng '+PORT));
