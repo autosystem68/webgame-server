@@ -614,7 +614,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.77 · sửa im lặng thiếu Uy Quyền</div>
+  <div id="ver">v0.79 · Sắc Lệnh Quân Đoàn (ultimate Cmd)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1274,10 +1274,11 @@ ws.onmessage=function(e){
   else if(m.t==='combo'){ comboPrompt.active=m.active; comboPrompt.slot=m.slot; comboPrompt.until=performance.now()+(m.windowMs||600); }
   else if(m.t==='echomark'){ if(m.active){ echoMark.active=true; echoMark.x=m.x; echoMark.y=m.y; echoMark.zone=m.zone; echoMark.maxDist=m.maxDist; echoMark.until=performance.now()+(m.windowMs||5000); } else { echoMark.active=false; } }
   else if(m.t==='skillcd'){ cd[m.slot]=m.dur; comboPrompt.active=false; }
-  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:(m.kind==='raven'?0.55:(m.kind==='orderflag'?0.5:(m.kind==='plantflag'?0.8:0.4)))));
+  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:(m.kind==='raven'?0.55:(m.kind==='orderflag'?0.5:(m.kind==='plantflag'?0.8:(m.kind==='rally'?0.7:0.4))))));
     fx.push({kind:m.kind,x:m.x,y:m.y,fx:m.fx,fy:m.fy,hue:m.hue,R:m.R||60,life:lf,max:lf});
     if(m.kind==='ring')shake=Math.max(shake,14); if(m.kind==='nova')shake=Math.max(shake,7);
-    if(m.kind==='bigswing')shake=Math.max(shake,m.hue===5?22:(m.hue===12?16:8)); }
+    if(m.kind==='bigswing')shake=Math.max(shake,m.hue===5?22:(m.hue===12?16:8));
+    if(m.kind==='rally')shake=Math.max(shake,14); }
   else if(m.t==='hit'){ dmgs.push({x:m.x,y:m.y,val:m.val,life:0.7,max:0.7,foe:m.foe}); if(!m.foe)shake=Math.max(shake,5);}
  }catch(e){}
 };
@@ -1542,6 +1543,15 @@ function frame(now){
         ctx.restore();
       }
     }
+    else if(f.kind==='rally'){
+      ctx.save();
+      ctx.globalAlpha=(f.life/f.max)*0.8;ctx.strokeStyle='#ffd76b';ctx.lineWidth=4;
+      ctx.beginPath();ctx.arc(f.x,f.y,(f.R||220)*t,0,7);ctx.stroke();
+      ctx.globalAlpha=(f.life/f.max)*0.5;ctx.strokeStyle='#ff5a5a';ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(f.x,f.y,(f.R||220)*t*0.85,0,7);ctx.stroke();
+      if(t<0.3){ ctx.globalAlpha=1;ctx.font='26px serif';ctx.textAlign='center';ctx.fillText('📣',f.x,f.y-10); }
+      ctx.restore();
+    }
     else if(f.kind==='plantflag'){
       if(t<0.5){
         var dt2=t/0.5;
@@ -1728,7 +1738,7 @@ function frame(now){
     ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
     ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
     ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
-    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
+    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
     if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-44); }
     ctx.globalAlpha=1;
   }
@@ -2186,12 +2196,14 @@ const SKILLS = {
     {id:'c6',name:'Áp Chế',     icon:'❄️',type:'slow', mp:26,cd:8,   unlockLv:13, radius:140,dmg:18,slowMul:0.5,slowDur:2.8, authGain:10},
     {id:'c7',name:'Xích Hút Sinh',icon:'⛓️',type:'lifesteal',mp:22,cd:4,unlockLv:16,range:220,dmg:26,lsPct:0.5,kind:'chain', authGain:8, reqStat:'STR',reqVal:18},
     {id:'c8',name:'Xung Kích Chỉ Huy',icon:'⚡',type:'leap',mp:30,cd:10,unlockLv:20,dist:200,dmg:40,impactR:95, authGain:12},
-    {id:'c9',name:'Xích Kéo',   icon:'🔗',type:'pull', mp:24,cd:9,   unlockLv:12, range:260,dmg:20,pullDist:150,authCost:50},
-    {id:'c10',name:'Lệnh Tấn Công',icon:'📯',type:'command',mp:35,cd:16,unlockLv:18, radius:200,atkBonus:0.3,dur:6,authCost:60},
+    {id:'c9',name:'Xích Kéo',   icon:'🔗',type:'pull', mp:24,cd:9,   unlockLv:12, range:260,dmg:20,pullDist:150,authCost:30},
+    {id:'c10',name:'Lệnh Tấn Công',icon:'📯',type:'command',mp:35,cd:16,unlockLv:18, radius:200,atkBonus:0.3,dur:6,authCost:35},
     {id:'c11',name:'Lệnh: Xung Phong',icon:'🐎',type:'cmdadvance', mp:20,cd:11, unlockLv:23, range:320,orderRange:320,orderHoldDur:2.5,authCost:20,sweepDmg:14,sweepR:55,
       desc:'GIỮ rồi kéo tới điểm muốn ra lệnh (giới hạn theo khoảng cách TỪ CHÍNH Cấm Vệ Quân, không phải từ bạn) — nhắm TRÚNG 1 kẻ địch thì Cấm Vệ Quân sẽ ĐUỔI THEO nó dù nó di chuyển, nhắm vị trí trống thì lao thẳng tới đó. Trên đường lao đi gây sát thương mọi địch chạm phải. Tới nơi: đứng lại 2.5s với giáo DÀI HƠN + đánh nhanh hơn hẳn. Hết giờ: LAO VỀ lại phía bạn — trên đường về TIẾP TỤC gây sát thương.'},
     {id:'c12',name:'Cờ Hiệu Đế Vương',icon:'🚩',type:'banner', mp:38,cd:18, unlockLv:29, range:260,radius:150,life:8,atkBuf:0.15,defBuf:0.12,authCost:15,
       desc:'GIỮ rồi kéo tới vị trí đặt cờ — cờ hạ xuống từ trên trời, cắm đất có bụi bay (khác hẳn nhịp nhanh của Xung Phong). Tồn tại 8s — đồng đội (kể cả Cấm Vệ Quân/pet) đứng trong vùng được +15% sát thương, +12% giảm dame nhận.'},
+    {id:'c13',name:'Sắc Lệnh Quân Đoàn',icon:'📣',type:'legiondecree', mp:60,cd:35, unlockLv:32, radius:220,dur:5,atkBuf:0.25,defBuf:0.15,enemyDebuf:0.2,authCost:45,
+      desc:'ULTIMATE — rúc tù và triệu tập, KHÔNG cần ngắm (tự kích hoạt quanh mình ngay). Trong bán kính 220 quanh bạn, 5s: đồng đội +25% sát thương/+15% giảm dame nhận, ĐỊCH bị -20% sát thương gây ra. Chấn động toàn khu vực — thời khắc quyết định trận đánh.'},
   ],
 };
 // ---- PASSIVE nội tại riêng từng class (LOL-signature style) ----
@@ -2227,9 +2239,10 @@ function doSkill(id,k,aim){
   const sid=p.loadout&&p.loadout[k]; const sk=findSkill(p.cls,sid); if(!sk||!meetsReq(p,sk))return;
   const isRecast = !!(sk.comboNext && p.comboState && p.comboState.skillId===sid && p.comboState.expireAt>Date.now());
   if(!isRecast){
-    if(p.cd[k]>0 || p.mp<sk.mp)return;
+    if(p.cd[k]>0)return; // client đã chặn từ trước + rung nút, đây chỉ là an toàn dự phòng
+    if(p.mp<sk.mp){ sendTo(id,{t:'toast',text:'Không đủ Mana ('+Math.floor(p.mp)+'/'+sk.mp+')',flashSlot:k}); return; }
     if(sk.authCost && (p.authority||0)<sk.authCost){ sendTo(id,{t:'toast',text:'Không đủ Uy Quyền ('+Math.floor(p.authority||0)+'/'+sk.authCost+')',flashSlot:k}); return; }
-    if(sk.hpReq && (p.hp/p.maxhp)>sk.hpReq)return;
+    if(sk.hpReq && (p.hp/p.maxhp)>sk.hpReq){ sendTo(id,{t:'toast',text:'Chỉ dùng được khi máu dưới '+Math.round(sk.hpReq*100)+'%',flashSlot:k}); return; }
   }
   if(aim && typeof aim.dx==='number' && typeof aim.dy==='number'){
     const d=Math.hypot(aim.dx,aim.dy);
@@ -2277,6 +2290,8 @@ function applyPassiveOnHit(p,id,target,dmg){
   let mul=1+auraBonus(p);
   if(p.cls==='blade' && p.spellBladeT>0){ mul*=1.5; p.spellBladeT=0; }
   if(p.bannerAtkBuf) mul*=(1+p.bannerAtkBuf);
+  if(p.decreeAtkBuf) mul*=(1+p.decreeAtkBuf);
+  if(p.decreeDebuffT>0) mul*=(p.decreeDebuffMul||1);
   return dmg*mul;
 }
 function doBasic(p,id){
@@ -2617,6 +2632,18 @@ function execSkill(p,id,sk,rank,step){
     const bx=p.x+p.fx*rng, by=p.y+p.fy*rng;
     banners.push({x:bx,y:by,zone:p.zone,radius:sk.radius,life:sk.life,atkBuf:sk.atkBuf,defBuf:sk.defBuf,owner:id});
     fxEv('plantflag',bx,by,45,0,0,sk.radius);
+  }
+  else if(sk.type==='legiondecree'){
+    if((p.authority||0)<sk.authCost)return; p.authority-=sk.authCost;
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
+      if(Math.hypot(e.x-p.x,e.y-p.y)<sk.radius){ e.atkDebuffT=sk.dur; e.atkDebuffMul=1-sk.enemyDebuf; } }
+    for(const pid2 in players){const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone)continue;
+      if(Math.hypot(o.x-p.x,o.y-p.y)>sk.radius)continue;
+      const isAlly=(pid2===id)||(o.party && p.party && o.party===p.party);
+      if(isAlly){ o.decreeAtkBuf=sk.atkBuf; o.decreeDefBuf=sk.defBuf; o.decreeBuffT=sk.dur; }
+      else if(!zoneOf(o).safe){ o.decreeDebuffMul=1-sk.enemyDebuf; o.decreeDebuffT=sk.dur; }
+    }
+    fxEv('rally',p.x,p.y,45,0,0,sk.radius);
   }
   else if(sk.type==='cone'){
     let fbonus=1;
@@ -3130,6 +3157,7 @@ function hurtPlayer(o,dmg,atkPid,atkEnemyObj,noReflect){ if(o.dead||o.iframe>0)r
   dmg*=(1-((o.gemBonus&&o.gemBonus.tho)||0)*0.08);
   if(o.warcryDefT>0) dmg*=(o.warcryDefMul||1);
   if(o.bannerDefBuf) dmg*=(1-o.bannerDefBuf);
+  if(o.decreeDefBuf) dmg*=(1-o.decreeDefBuf);
   if(o.windguardT>0){
     let attacker=null; if(atkPid&&players[atkPid])attacker=players[atkPid]; else if(atkEnemyObj)attacker=atkEnemyObj;
     if(attacker){ const ang=Math.atan2(attacker.y-o.y,attacker.x-o.x); const fa=Math.atan2(o.windguardFy,o.windguardFx);
@@ -3200,6 +3228,9 @@ setInterval(()=>{
         }
         if(p.duelT<=0){ p.duelTargetObj=null; } } }
     if(p.cls==='arc'){ if(p.windguardT>0)p.windguardT-=dt; if(p.wildHuntT>0)p.wildHuntT-=dt; }
+    if(p.cls==='cmd') p.authority=Math.min(100,(p.authority||0)+4*dt);
+    if(p.decreeBuffT>0){ p.decreeBuffT-=dt; if(p.decreeBuffT<=0){ p.decreeAtkBuf=0; p.decreeDefBuf=0; } }
+    if(p.decreeDebuffT>0){ p.decreeDebuffT-=dt; if(p.decreeDebuffT<=0) p.decreeDebuffMul=1; }
     if(p.cls==='mage' && p.arcaneStateT>0){ p.arcaneStateT-=dt; if(p.arcaneStateT<=0)p.arcaneState=null; }
     if(p.cls==='arc' && p.focus>0 && p.hurtT>3){ p.focus=Math.max(0,p.focus-6*dt); }
     if(p.cls==='blade' && p.hurtT>3){ if(p.momentum>0)p.momentum=Math.max(0,p.momentum-5*dt); if(p.arcane>0)p.arcane=Math.max(0,p.arcane-5*dt); }
@@ -3338,7 +3369,7 @@ setInterval(()=>{
     try{
       psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,
         spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0),
-        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),
+        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),
         slowed:(p.slowT>0&&(p.slowMul||1)>=0.15),rooted:(p.slowT>0&&(p.slowMul||1)<0.15)};
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
@@ -3376,4 +3407,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.77 (sửa im lặng thiếu Uy Quyền) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.79 (Sắc Lệnh Quân Đoàn ultimate Cmd) chạy ở cổng '+PORT));
