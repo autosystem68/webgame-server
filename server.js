@@ -615,7 +615,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.82 · Blade batch 1: nền stance + 2 skill</div>
+  <div id="ver">v0.83 · stance có lợi ích thật (hút máu/tiết kiệm MP)</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1234,7 +1234,7 @@ ws.onmessage=function(e){
       });
         if(me.cls==='blade' && me.res.length>=2){
           var mV=me.res[0].val, aV=me.res[1].val;
-          var stTxt=(mV>aV+15)?'⚔️ Đang nghiêng KIẾM':(aV>mV+15)?'🔮 Đang nghiêng PHÉP':'⚖️ Cân Bằng (Hybrid)';
+          var stTxt=(mV>aV+15)?'⚔️ KIẾM (+10% hút máu)':(aV>mV+15)?'🔮 PHÉP (-20% Mana)':'⚖️ Cân Bằng (+5%HM/-10%MP)';
           var stCol=(mV>aV+15)?'#ff8a5a':(aV>mV+15)?'#a878ff':'#ffd76b';
           var stLbl=document.createElement('div'); stLbl.style.cssText='font-size:10px;font-weight:bold;color:'+stCol+';margin-top:2px'; stLbl.textContent=stTxt;
           resBox.appendChild(stLbl);
@@ -2262,7 +2262,7 @@ const PASSIVES = {
   war:  {name:'Huyết Chiến (Momentum)', desc:'Đánh/chịu dame tích Chiến Ý — Battle Ready (40+): +7% dame, Blood Frenzy (80+): +15% dame, +tốc đánh, -10% dame nhận. Giảm dần nếu ngừng combat 3s. (Ý Chí Sắt: máu <30% → -20% dame nhận 3s, hồi sau 15s)'},
   mage: {name:'Chuỗi Nguyên Tố',desc:'3 skill mang hệ Lửa/Băng/Huyền Bí riêng biệt. Dùng skill khác hệ với lần trước → kích phản ứng +35% sát thương. Dùng liên tiếp cùng hệ thì KHÔNG có bonus — phải xoay vòng nguyên tố để tối ưu.'},
   arc:  {name:'Nhịp Điệu Thợ Săn', desc:'Sát Thủ: đánh mục tiêu <30% máu → x1.5 dmg. Nhịp Điệu: bắn xong di chuyển đúng hướng → phát tiếp +25% dmg. Săn Bạc: đánh liên tục cùng 1 mục tiêu, đủ 5 lần → dmg thêm theo %máu tối đa mục tiêu'},
-  blade:{name:'Song Tu (Dual Mastery)', desc:'Stance KHÔNG bấm chọn — tự động nghiêng theo bạn đang dùng nhiều đòn Kiếm (Momentum) hay đòn Phép (Arcane) gần đây, xem 2 thanh tài nguyên dưới HUD. Nghiêng hẳn 1 bên → skill đổi HẲN cách hoạt động (không chỉ đổi số liệu). Cân bằng cả 2 (Hybrid) → mọi skill có bản pha trộn nhẹ cả hai. Ngoài ra: Skill trúng địch → đòn thường tiếp theo +50% sát thương.'},
+  blade:{name:'Song Tu (Dual Mastery)', desc:'Stance KHÔNG bấm chọn — tự động nghiêng theo bạn đang dùng nhiều đòn Kiếm (Momentum) hay đòn Phép (Arcane) gần đây, xem 2 thanh tài nguyên dưới HUD. Cả 3 trạng thái đều +15% sát thương NHƯ NHAU (không ai mạnh hơn ai) — khác biệt nằm ở TIỆN ÍCH riêng: nghiêng KIẾM → hút 10% sát thương thành máu (sống dai); nghiêng PHÉP → giảm 20% chi phí Mana mọi skill (đánh liên tục hơn); Cân Bằng (Hybrid) → có cả 2 nhưng ở mức nửa (hút 5% máu + giảm 10% Mana) — không mạnh nhất 1 mặt nào nhưng linh hoạt nhất. Ngoài ra: Skill trúng địch → đòn thường tiếp theo +50% sát thương.'},
   cmd:  {name:'Chỉ Huy',    desc:'Đồng đội trong 150px quanh bạn được +8% sát thương'},
 };
 function findSkill(cls,id){ return (SKILLS[cls]||[]).find(s=>s.id===id); }
@@ -2308,7 +2308,11 @@ function doSkill(id,k,aim){
     if(p.chargeStart)p.chargeStart[k]=null;
   } else { p.chargeMul=1; p.chargeTier=0; }
   const curStep = isRecast ? (p.comboState.step+1) : 1;
-  if(!isRecast) p.mp-=sk.mp;
+  if(!isRecast){
+    let mpCost=sk.mp;
+    if(p.cls==='blade'){ const bst=getStance(p); if(bst==='arcane')mpCost*=0.8; else if(bst==='hybrid')mpCost*=0.9; }
+    p.mp-=mpCost;
+  }
   const maxStep = sk.comboMaxStep||2;
   const isFinalStep = !sk.comboNext || curStep>=maxStep;
   if(sk.comboNext && !isFinalStep){
@@ -2346,6 +2350,12 @@ function mageReaction(p,sk){
 function applyPassiveOnHit(p,id,target,dmg){
   let mul=1+auraBonus(p);
   if(p.cls==='blade' && p.spellBladeT>0){ mul*=1.5; p.spellBladeT=0; }
+  if(p.cls==='blade'){
+    const stance=getStance(p);
+    mul*=1.15; // cả 3 trạng thái đều +15% dame như nhau — khác biệt nằm ở TIỆN ÍCH đi kèm, không phải ai mạnh hơn ai
+    const lsPct=(stance==='blade')?0.10:(stance==='hybrid')?0.05:0;
+    if(lsPct>0) p.hp=Math.min(p.maxhp,p.hp+dmg*mul*lsPct);
+  }
   if(p.bannerAtkBuf) mul*=(1+p.bannerAtkBuf);
   if(p.decreeAtkBuf) mul*=(1+p.decreeAtkBuf);
   if(p.decreeDebuffT>0) mul*=(p.decreeDebuffMul||1);
@@ -3642,4 +3652,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.82 (Blade batch 1: nền stance + 2 skill) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.83 (stance có lợi ích thật) chạy ở cổng '+PORT));
