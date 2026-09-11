@@ -344,6 +344,7 @@ const CLIENT = `<!doctype html>
   #sW{width:54px;height:54px;right:99px;bottom:64px}
   #sE{width:54px;height:54px;right:64px;bottom:99px}
   #sR{width:58px;height:58px;right:14px;bottom:112px;border-color:#d9a04a}
+  #sSwap{width:46px;height:46px;right:45px;bottom:155px;border-color:#a878ff}
   #st{position:absolute;left:0;right:0;bottom:56px;text-align:center;font-size:10px;color:#7a6a4a;pointer-events:none;z-index:5}
   .menubtn{position:absolute;bottom:52px;width:40px;height:40px;border-radius:10px;z-index:7;display:none;
     background:radial-gradient(circle at 35% 30%,#2c2114,#171009);border:2px solid #a87b3e;color:#e0b062;
@@ -608,7 +609,7 @@ const CLIENT = `<!doctype html>
   </div>
   <div id="info"><span id="zonelbl">🏘️ Thị Trấn An Bình · An toàn</span><br><span id="bosslbl" style="color:#ffb0b0"></span><br><span id="cnt">0</span> online<br><span id="dglbl" style="color:#c77dff"></span></div>
   <div id="cluster">
-    <div class="sk basic" id="sSwap" style="display:none;background:radial-gradient(circle,#3a2a5a,#1a1030)"><span class="k">⇄</span><span class="l" id="swapLbl">KIẾM</span><div class="cd"></div></div>
+    <div class="sk" id="sSwap" style="display:none;background:radial-gradient(circle,#3a2a5a,#1a1030)"><span class="k">⇄</span><span class="l" id="swapLbl">KIẾM</span><div class="cd"></div></div>
     <div class="sk basic" id="sB"><span class="k">⚔</span><span class="l">THƯỜNG</span><div class="cd"></div></div>
     <div class="sk" id="sQ"><span class="k">Q</span><span class="l">LƯỚT</span><span class="m">12</span><div class="cd"></div></div>
     <div class="sk" id="sW"><span class="k">W</span><span class="l">TIA</span><span class="m">18</span><div class="cd"></div></div>
@@ -616,7 +617,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.86 · Blade: đổi vũ khí chủ động (Jayce-style)</div>
+  <div id="ver">v0.87 · fix nút đổi vũ khí bị đè khuất</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -3669,4 +3670,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.86 (Blade: đổi vũ khí chủ động Jayce-style) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.87 (fix nút đổi vũ khí bị đè khuất) chạy ở cổng '+PORT));
