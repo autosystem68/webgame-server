@@ -84,14 +84,15 @@ function tickSummon(p,id,dt){
   }
   const empowered=(s.orderPhase==='hold');
   const moving=(s.orderPhase==='charge'||s.orderPhase==='return');
+  const willBuf=(p.commandStateT>0)?(p.commandStateSummonBuf||0):0;
   s.atkT=(s.atkT||0)-dt;
   if(s.atkT<=0 && !moving){
-    s.atkT=empowered?0.55:1.5;
+    s.atkT=(empowered?0.55:1.5)/(1+willBuf*0.5);
     const atkRange=empowered?250:170;
     let best=null,bd=atkRange;
     for(const eid in enemies){const e=enemies[eid];if(e.dead||e.zone!==s.zone)continue;if(!getStatus(e,'ravenmark'))continue;const d=Math.hypot(e.x-s.x,e.y-s.y);if(d<atkRange+60){best=e;bd=d;break;}}
     if(!best) for(const eid in enemies){const e=enemies[eid];if(e.dead||e.zone!==s.zone)continue;const d=Math.hypot(e.x-s.x,e.y-s.y);if(d<bd){bd=d;best=e;}}
-    if(best){ const dmul=(empowered?1.6:1)*(getStatus(best,'ravenmark')?1.25:1); hurtEnemy(best,s.atk*dmul,id); fxEv('swing',best.x,best.y,45,1,0,0); }
+    if(best){ const dmul=(empowered?1.6:1)*(getStatus(best,'ravenmark')?1.25:1)*(1+willBuf); hurtEnemy(best,s.atk*dmul,id); fxEv('swing',best.x,best.y,45,1,0,0); }
   }
 }
 function summonSweep(s,id){
@@ -614,7 +615,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.80 · /set admin linh hoạt (lv 99)</div>
+  <div id="ver">v0.82 · Blade batch 1: nền stance + 2 skill</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1230,7 +1231,15 @@ ws.onmessage=function(e){
         wrap.appendChild(fill); resBox.appendChild(wrap);
         var lbl=document.createElement('div'); lbl.style.cssText='font-size:9px;color:#9a8a6a;margin-bottom:2px'; lbl.textContent=r.label+' '+r.val+'/'+r.max;
         resBox.appendChild(lbl);
-      }); }
+      });
+        if(me.cls==='blade' && me.res.length>=2){
+          var mV=me.res[0].val, aV=me.res[1].val;
+          var stTxt=(mV>aV+15)?'⚔️ Đang nghiêng KIẾM':(aV>mV+15)?'🔮 Đang nghiêng PHÉP':'⚖️ Cân Bằng (Hybrid)';
+          var stCol=(mV>aV+15)?'#ff8a5a':(aV>mV+15)?'#a878ff':'#ffd76b';
+          var stLbl=document.createElement('div'); stLbl.style.cssText='font-size:10px;font-weight:bold;color:'+stCol+';margin-top:2px'; stLbl.textContent=stTxt;
+          resBox.appendChild(stLbl);
+        }
+      }
       if(invOpen){var rg=document.getElementById('rg'),rs=document.getElementById('rs');if(rg)rg.textContent=me.gold;if(rs)rs.textContent=me.stones||0;}
       myBuild.STR=me.STR||0;myBuild.VIT=me.VIT||0;myBuild.AGI=me.AGI||0;myBuild.INT=me.INT||0;
       myBuild.statPts=me.statPts||0;myBuild.skillPts=me.skillPts||0;
@@ -1274,7 +1283,7 @@ ws.onmessage=function(e){
   else if(m.t==='combo'){ comboPrompt.active=m.active; comboPrompt.slot=m.slot; comboPrompt.until=performance.now()+(m.windowMs||600); }
   else if(m.t==='echomark'){ if(m.active){ echoMark.active=true; echoMark.x=m.x; echoMark.y=m.y; echoMark.zone=m.zone; echoMark.maxDist=m.maxDist; echoMark.until=performance.now()+(m.windowMs||5000); } else { echoMark.active=false; } }
   else if(m.t==='skillcd'){ cd[m.slot]=m.dur; comboPrompt.active=false; }
-  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:(m.kind==='raven'?0.55:(m.kind==='orderflag'?0.5:(m.kind==='plantflag'?0.8:(m.kind==='rally'?0.7:0.4))))));
+  else if(m.t==='fx'){ var lf=(m.kind==='enchok'||m.kind==='enchfail')?0.6:(m.kind==='starfall'?0.9:(m.kind==='bigswing'?0.5:(m.kind==='raven'?0.55:(m.kind==='orderflag'?0.5:(m.kind==='plantflag'?0.8:(m.kind==='rally'?0.7:(m.kind==='horsecharge'?0.4:(m.kind==='ravenscout'?0.6:(m.kind==='sacrifice'?0.5:(m.kind==='soulburst'?0.6:0.4))))))))));
     fx.push({kind:m.kind,x:m.x,y:m.y,fx:m.fx,fy:m.fy,hue:m.hue,R:m.R||60,life:lf,max:lf});
     if(m.kind==='ring')shake=Math.max(shake,14); if(m.kind==='nova')shake=Math.max(shake,7);
     if(m.kind==='bigswing')shake=Math.max(shake,m.hue===5?22:(m.hue===12?16:8));
@@ -1350,7 +1359,7 @@ var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
 function isChannelable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].channelable; } return false; }
 var AIMABLE_TYPES={dash:1,warcleave:1,predstep:1,groundbreak:1,pierce:1,huntmark:1,trap:1,starfall:1,windguard:1,
-  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,arcanedet:1,blooddebt:1,warlordverdict:1,ravenmark:1,cmdadvance:1,banner:1,proj:1,cone:1,nova:1,slow:1,leap:1};
+  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,arcanedet:1,blooddebt:1,warlordverdict:1,ravenmark:1,cmdadvance:1,banner:1,horsecharge:1,tacticalrecall:1,blinkcut:1,arcslash:1,proj:1,cone:1,nova:1,slow:1,leap:1};
 function isAimable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!AIMABLE_TYPES[myFull[i].type]; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
@@ -1542,6 +1551,39 @@ function frame(now){
         ctx.font='16px serif';ctx.textAlign='center';ctx.fillText('🐦‍⬛',f.x,f.y+5);
         ctx.restore();
       }
+    }
+    else if(f.kind==='horsecharge'){
+      ctx.save();ctx.globalAlpha=(f.life/f.max)*0.6;ctx.strokeStyle='#c9a86a';ctx.lineWidth=8;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(f.fx,f.fy);ctx.lineTo(f.x,f.y);ctx.stroke();
+      ctx.globalAlpha=(f.life/f.max);ctx.strokeStyle='#ffd76b';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(f.fx,f.fy);ctx.lineTo(f.x,f.y);ctx.stroke();
+      ctx.restore();
+    }
+    else if(f.kind==='ravenscout'){
+      ctx.save();
+      for(var rsi=0;rsi<5;rsi++){ var rang=(performance.now()/300)+rsi*1.26;
+        var rr=(f.R||280)*(0.4+0.5*((rsi*23)%10)/10);
+        var rx2=f.x+Math.cos(rang)*rr, ry2=f.y+Math.sin(rang)*rr;
+        ctx.globalAlpha=(f.life/f.max)*0.85;ctx.font='13px serif';ctx.textAlign='center';ctx.fillText('🐦',rx2,ry2); }
+      ctx.globalAlpha=(f.life/f.max)*0.15;ctx.strokeStyle='#8ad6ff';ctx.lineWidth=1.5;ctx.setLineDash([3,8]);
+      ctx.beginPath();ctx.arc(f.x,f.y,f.R||280,0,7);ctx.stroke();ctx.setLineDash([]);
+      ctx.restore();
+    }
+    else if(f.kind==='sacrifice'){
+      ctx.save();ctx.globalAlpha=(f.life/f.max)*0.7;ctx.strokeStyle='#c93a3a';ctx.lineWidth=3;
+      ctx.beginPath();ctx.arc(f.x,f.y,(f.R||60)*(1-t),0,7);ctx.stroke();
+      ctx.globalAlpha=(f.life/f.max);ctx.font='16px serif';ctx.textAlign='center';ctx.fillText('💔',f.x,f.y-10-t*15);
+      ctx.restore();
+    }
+    else if(f.kind==='soulburst'){
+      ctx.save();
+      for(var sbi=0;sbi<6;sbi++){ var sbang=sbi*1.05;
+        var sbr=(f.R||60)*t;
+        var sbx=f.x+Math.cos(sbang)*sbr, sby=f.y+Math.sin(sbang)*sbr-t*20;
+        ctx.globalAlpha=(f.life/f.max)*(1-t)*0.9;ctx.fillStyle='#c9a8ff';ctx.beginPath();ctx.arc(sbx,sby,3,0,7);ctx.fill(); }
+      ctx.globalAlpha=(f.life/f.max)*0.5;ctx.strokeStyle='#c9a8ff';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(f.x,f.y,(f.R||60)*t,0,7);ctx.stroke();
+      ctx.restore();
     }
     else if(f.kind==='rally'){
       ctx.save();
@@ -1738,7 +1780,7 @@ function frame(now){
     ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
     ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
     ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
-    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
+    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.sacrificeBuf)pStIc+='💔'; if(p.soulBuf)pStIc+='📖'; if(p.willActive)pStIc+='👑'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
     if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-44); }
     ctx.globalAlpha=1;
   }
@@ -1787,7 +1829,7 @@ function frame(now){
       ctx.beginPath();ctx.moveTo(bxB,byB+16);ctx.lineTo(bxB,byB-14);ctx.stroke();
       ctx.fillStyle='#ffd76b';ctx.beginPath();ctx.moveTo(bxB,byB-14);ctx.lineTo(bxB+16,byB-9);ctx.lineTo(bxB,byB-4);ctx.closePath();ctx.fill();
       ctx.restore();
-    } else if(aimSk && (aimSk.type==='arcanedet'||aimSk.type==='blooddebt'||aimSk.type==='warlordverdict'||aimSk.type==='ravenmark')){
+    } else if(aimSk && (aimSk.type==='arcanedet'||aimSk.type==='blooddebt'||aimSk.type==='warlordverdict'||aimSk.type==='ravenmark'||aimSk.type==='tacticalrecall')){
       var apx0=(myPX!==null?myPX:meNow.x), apy0=(myPY!==null?myPY:meNow.y);
       var maxR0=aimSk.range||160;
       ctx.save();ctx.globalAlpha=0.22;ctx.strokeStyle='#ffb060';ctx.lineWidth=1.5;ctx.setLineDash([4,6]);
@@ -2176,8 +2218,10 @@ const SKILLS = {
       desc:'Chọn 1 mục tiêu làm "con mồi" trong 8s — tăng 30% tốc độ đánh của bạn suốt thời gian này + gắn Dấu Ấn Thợ Săn dài hạn lên nó. Ultimate tăng DPS toàn diện.'},
   ],
   blade:[
-    {id:'b1',name:'Lướt Kiếm',  icon:'💨',type:'dash', mp:10,cd:2.0, unlockLv:2,  dist:165},
-    {id:'b2',name:'Chém Phép',  icon:'⚔️',type:'cone', mp:16,cd:1.0, unlockLv:3,  range:115,arc:0.95,dmg:25},
+    {id:'b1',name:'Chớp Cắt',   icon:'💨',type:'blinkcut', mp:10,cd:2.0, unlockLv:2,  distBlade:110,distArcane:190,dmgBlade:22,
+      desc:'Hành vi đổi theo stance đang dẫn (Momentum vs Arcane, xem 2 thanh dưới HUD): đang nghiêng KIẾM → lao ngắn XUYÊN QUA địch trên đường, gây dame; đang nghiêng PHÉP → dịch chuyển XA HƠN hẳn, không gây dame nhưng né đòn tốt hơn. Cân bằng (Hybrid) → lao tầm trung, dame nhẹ.'},
+    {id:'b2',name:'Chém Cung',  icon:'⚔️',type:'arcslash', mp:16,cd:1.2, unlockLv:3,  range:115,arc:0.95,dmgBlade:26,rangeArcane:340,dmgArcane:24,
+      desc:'Hành vi đổi theo stance: nghiêng KIẾM → chém cận chiến hình quạt thật gần; nghiêng PHÉP → phóng 1 lưỡi kiếm năng lượng bay xa; Cân bằng → chém quạt NGẮN + có thêm chút dame phép cộng thêm. Đòn Kiếm nuôi Momentum, đòn Phép nuôi Arcane — tự đẩy bản thân nghiêng dần về 1 phía nếu cứ dùng 1 kiểu.'},
     {id:'b3',name:'Sóng Kiếm',  icon:'🌊',type:'proj', mp:24,cd:3,   unlockLv:5,  count:3,spread:0.4,dmg:27,speed:520,r:7},
     {id:'b4',name:'Vũ Bão',     icon:'🌀',type:'nova', mp:55,cd:12,  unlockLv:7,  radius:185,dmg:82},
     {id:'b5',name:'Kiếm Hút Sinh',icon:'🩸',type:'lifesteal',mp:18,cd:3.5,unlockLv:10,range:105,dmg:28,lsPct:0.55, reqStat:'STR',reqVal:12},
@@ -2190,14 +2234,21 @@ const SKILLS = {
     {id:'c1',name:'Lướt',       icon:'💨',type:'dash', mp:10,cd:2.2, unlockLv:2,  dist:150},
     {id:'c2',name:'Dấu Quạ',    icon:'🐦‍⬛',type:'ravenmark', mp:14,cd:8,   unlockLv:3,  range:260,dur:8,bonusPct:0.15,
       desc:'GIỮ rồi kéo tới đúng mục tiêu muốn đánh dấu (nhắm hụt không trúng ai). 1 con quạ thật bay từ bạn tới đích rồi đáp xuống đóng dấu. Cấm Vệ Quân/pet ƯU TIÊN tuyệt đối tấn công mục tiêu này, đòn của chúng lên nó +25% dame. Đòn của chính bạn lên nó cũng +15%.'},
-    {id:'c3',name:'Chữa Trị',   icon:'💚',type:'heal', mp:30,cd:7,   unlockLv:5,  radius:165,heal:60, authGain:12, reqStat:'INT',reqVal:10},
+    {id:'c3',name:'Mắt Quạ',    icon:'👁️',type:'ravenseye', mp:20,cd:12,  unlockLv:5,  radius:280,dur:4,rangeBuf:0.2,
+      desc:'Thả bầy quạ trinh sát bay vòng quanh 1 vùng lớn (không cần ngắm, tự kích quanh mình) — MỌI địch trong vùng lộ rõ % máu chính xác trong 4s. Đồng đội trong vùng được +20% tầm đánh thường tạm thời — "biết trước địch ở đâu, ra tay trước".'},
     {id:'c4',name:'Uy Lệnh',    icon:'👑',type:'summon', mp:55,cd:20,  unlockLv:7,  dur:20,atk:18,spdmul:1.2,radius:170,dmg:32, authGain:18},
-    {id:'c5',name:'Giáp Hộ Vệ', icon:'🛡️',type:'shield',mp:26,cd:10,unlockLv:10, amount:55,dur:5,radius:160, authGain:10},
-    {id:'c6',name:'Áp Chế',     icon:'❄️',type:'slow', mp:26,cd:8,   unlockLv:13, radius:140,dmg:18,slowMul:0.5,slowDur:2.8, authGain:10},
-    {id:'c7',name:'Xích Hút Sinh',icon:'⛓️',type:'lifesteal',mp:22,cd:4,unlockLv:16,range:220,dmg:26,lsPct:0.5,kind:'chain', authGain:8, reqStat:'STR',reqVal:18},
-    {id:'c8',name:'Xung Kích Chỉ Huy',icon:'⚡',type:'leap',mp:30,cd:10,unlockLv:20,dist:200,dmg:40,impactR:95, authGain:12},
-    {id:'c9',name:'Xích Kéo',   icon:'🔗',type:'pull', mp:24,cd:9,   unlockLv:12, range:260,dmg:20,pullDist:150,authCost:30},
-    {id:'c10',name:'Lệnh Tấn Công',icon:'📯',type:'command',mp:35,cd:16,unlockLv:18, radius:200,atkBonus:0.3,dur:6,authCost:35},
+    {id:'c5',name:'Triệu Hồi Hoàng Gia',icon:'✨',type:'royalsummons', mp:18,cd:14, unlockLv:10, reqStat:'VIT',reqVal:12,
+      desc:'Dịch chuyển NGAY LẬP TỨC Cấm Vệ Quân về sát bên bạn, bất kể nó đang ở đâu (kể cả đang lao/đứng tăng cường giữa chừng — hủy lệnh cũ). Cứu lính khi nó bị bỏ lại quá xa hoặc mắc kẹt.'},
+    {id:'c6',name:'Triệu Hồi Chiến Thuật',icon:'🧲',type:'tacticalrecall', mp:26,cd:15, unlockLv:13, range:300,pullDist:180,delay:0.9,
+      desc:'GIỮ rồi kéo tới đúng ĐỒNG ĐỘI (cùng tổ đội) muốn kéo về — có độ trễ 0.9s trước khi kéo thật (đồng đội kịp thấy dấu hiệu, không bị giật bất ngờ). Chỉ tác dụng lên đồng đội, không dùng được lên địch trong PK.'},
+    {id:'c7',name:'Kỵ Binh Xung Phong',icon:'🐴',type:'horsecharge', mp:32,cd:13, unlockLv:16, len:280,width:70,dmg:34,pushDist:90, reqStat:'STR',reqVal:18,
+      desc:'GIỮ rồi kéo hướng lao — CHÍNH BẠN cưỡi ngựa xông thẳng theo 1 đường (không phải hình tròn), mọi địch trên đường bị hủy + đẩy dạt sang 2 BÊN đường đi (không đẩy lùi). Nhánh Battle Lord — chỉ huy tự mình xông trận.'},
+    {id:'c8',name:'Hy Sinh Chỉ Huy',icon:'💔',type:'cmdsacrifice', mp:15,cd:20, unlockLv:20, durCost:6,atkBuf:0.35,healBurst:70,dur:5,
+      desc:'Cần đã có Cấm Vệ Quân. Rút ngắn 6s thời gian tồn tại của nó (hi sinh thời gian phục vụ) để đổi lấy: cả tổ đội hồi máu ngay + trong 5s +35% sát thương. Đánh đổi thật — cân nhắc trước khi dùng.'},
+    {id:'c9',name:'Sổ Linh Hồn', icon:'📖',type:'soulledger', mp:20,cd:10, unlockLv:12, fragCap:10,healPerFrag:14,buffPerFrag:0.02,
+      desc:'Thụ động: mỗi khi có địch chết gần bạn (bất kỳ ai hạ), bạn nhặt được 1 "mảnh hồn" (tối đa 10). Chủ động bấm skill này: TIÊU TOÀN BỘ mảnh đã gom để hồi máu lớn + tăng sát thương ngắn hạn — gom càng nhiều, nổ càng mạnh.'},
+    {id:'c10',name:'Ý Chí Hoàng Đế',icon:'👑',type:'emperorswill',mp:70,cd:45, unlockLv:35, dur:8,summonBuf:0.5,bannerBuf:0.5,auraBuf:0.5,authCost:40,
+      desc:'ULTIMATE thứ 2 — mở Trạng Thái Chỉ Huy Tối Cao 8s: Cấm Vệ Quân +50% sát thương/tốc đánh, mọi Cờ Hiệu đang tồn tại +50% hiệu quả buff, hào quang Command +50%. Không tự đánh mạnh hơn — SỨC MẠNH NẰM Ở NHỮNG GÌ BẠN ĐIỀU KHIỂN, đúng cốt lõi triết lý Thống Lĩnh.'},
     {id:'c11',name:'Lệnh: Xung Phong',icon:'🐎',type:'cmdadvance', mp:20,cd:11, unlockLv:23, range:320,orderRange:320,orderHoldDur:2.5,authCost:20,sweepDmg:14,sweepR:55,
       desc:'GIỮ rồi kéo tới điểm muốn ra lệnh (giới hạn theo khoảng cách TỪ CHÍNH Cấm Vệ Quân, không phải từ bạn) — nhắm TRÚNG 1 kẻ địch thì Cấm Vệ Quân sẽ ĐUỔI THEO nó dù nó di chuyển, nhắm vị trí trống thì lao thẳng tới đó. Trên đường lao đi gây sát thương mọi địch chạm phải. Tới nơi: đứng lại 2.5s với giáo DÀI HƠN + đánh nhanh hơn hẳn. Hết giờ: LAO VỀ lại phía bạn — trên đường về TIẾP TỤC gây sát thương.'},
     {id:'c12',name:'Cờ Hiệu Đế Vương',icon:'🚩',type:'banner', mp:38,cd:18, unlockLv:29, range:260,radius:150,life:8,atkBuf:0.15,defBuf:0.12,authCost:15,
@@ -2211,7 +2262,7 @@ const PASSIVES = {
   war:  {name:'Huyết Chiến (Momentum)', desc:'Đánh/chịu dame tích Chiến Ý — Battle Ready (40+): +7% dame, Blood Frenzy (80+): +15% dame, +tốc đánh, -10% dame nhận. Giảm dần nếu ngừng combat 3s. (Ý Chí Sắt: máu <30% → -20% dame nhận 3s, hồi sau 15s)'},
   mage: {name:'Chuỗi Nguyên Tố',desc:'3 skill mang hệ Lửa/Băng/Huyền Bí riêng biệt. Dùng skill khác hệ với lần trước → kích phản ứng +35% sát thương. Dùng liên tiếp cùng hệ thì KHÔNG có bonus — phải xoay vòng nguyên tố để tối ưu.'},
   arc:  {name:'Nhịp Điệu Thợ Săn', desc:'Sát Thủ: đánh mục tiêu <30% máu → x1.5 dmg. Nhịp Điệu: bắn xong di chuyển đúng hướng → phát tiếp +25% dmg. Săn Bạc: đánh liên tục cùng 1 mục tiêu, đủ 5 lần → dmg thêm theo %máu tối đa mục tiêu'},
-  blade:{name:'Song Tu',    desc:'Skill trúng địch → đòn thường tiếp theo +50% sát thương'},
+  blade:{name:'Song Tu (Dual Mastery)', desc:'Stance KHÔNG bấm chọn — tự động nghiêng theo bạn đang dùng nhiều đòn Kiếm (Momentum) hay đòn Phép (Arcane) gần đây, xem 2 thanh tài nguyên dưới HUD. Nghiêng hẳn 1 bên → skill đổi HẲN cách hoạt động (không chỉ đổi số liệu). Cân bằng cả 2 (Hybrid) → mọi skill có bản pha trộn nhẹ cả hai. Ngoài ra: Skill trúng địch → đòn thường tiếp theo +50% sát thương.'},
   cmd:  {name:'Chỉ Huy',    desc:'Đồng đội trong 150px quanh bạn được +8% sát thương'},
 };
 function findSkill(cls,id){ return (SKILLS[cls]||[]).find(s=>s.id===id); }
@@ -2271,10 +2322,16 @@ function doSkill(id,k,aim){
   execSkill(p,id,sk,(p.skRank&&p.skRank[sid])||1,curStep);
 }
 function rankMul(rank){ return 1+(rank-1)*0.22; } // rank 1..5 → tới +88% dmg
+function getStance(p){ // Ma Kiếm Sĩ: stance ĐỘNG theo tài nguyên nào đang dẫn — không phải nút chuyển tay
+  const m=p.momentum||0, a=p.arcane||0;
+  if(m>a+15) return 'blade';
+  if(a>m+15) return 'arcane';
+  return 'hybrid';
+}
 function auraBonus(p){ // Chỉ Huy: đồng minh gần được +8% dmg từ chính người đó khi tính damage của HỌ
   if(p.cls==='cmd')return 0; // bản thân không tự buff mình qua aura
   for(const pid in players){ const o=players[pid]; if(o===p||!o.chosen||o.dead||o.cls!=='cmd')continue;
-    if(Math.hypot(o.x-p.x,o.y-p.y)<150)return 0.08; }
+    if(Math.hypot(o.x-p.x,o.y-p.y)<150) return 0.08*(1+((o.commandStateT>0)?(o.commandStateAuraBuf||0):0)); }
   return 0;
 }
 function markBonus(ent){ const s=getStatus(ent,'huntmark'); return s?(1+(s.data.bonus||0)):1; }
@@ -2292,6 +2349,8 @@ function applyPassiveOnHit(p,id,target,dmg){
   if(p.bannerAtkBuf) mul*=(1+p.bannerAtkBuf);
   if(p.decreeAtkBuf) mul*=(1+p.decreeAtkBuf);
   if(p.decreeDebuffT>0) mul*=(p.decreeDebuffMul||1);
+  if(p.sacrificeAtkBufT>0) mul*=(1+(p.sacrificeAtkBuf||0));
+  if(p.soulBufT>0) mul*=(1+(p.soulBuf||0));
   return dmg*mul;
 }
 function doBasic(p,id){
@@ -2645,6 +2704,137 @@ function execSkill(p,id,sk,rank,step){
     }
     fxEv('rally',p.x,p.y,45,0,0,sk.radius);
   }
+  else if(sk.type==='ravenseye'){
+    for(const pid2 in players){const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone)continue;
+      const isAlly=(pid2===id)||(o.party && p.party && o.party===p.party);
+      if(isAlly && Math.hypot(o.x-p.x,o.y-p.y)<sk.radius){ o.buffT=Math.max(o.buffT||0,sk.dur); o.buffSpdMul=Math.max(o.buffSpdMul||1,1+sk.rangeBuf); o.buffAtk=o.buffAtk||0; } }
+    fxEv('ravenscout',p.x,p.y,45,0,0,sk.radius);
+  }
+  else if(sk.type==='royalsummons'){
+    if(!p.summon){ sendTo(id,{t:'toast',text:'Chưa có Cấm Vệ Quân để triệu hồi về'}); return; }
+    p.summon.x=p.x+p.fx*30; p.summon.y=p.y+p.fy*30; p.summon.zone=p.zone;
+    p.summon.orderPhase=null; p.summon.orderTargetId=null; p.summon.chargeT=0;
+    fxEv('ring',p.summon.x,p.summon.y,45,0,0,30);
+  }
+  else if(sk.type==='tacticalrecall'){
+    let targetId=null;
+    if(p.wasAimed){
+      const ax=p.x+p.fx*sk.range*p.aimMag, ay=p.y+p.fy*sk.range*p.aimMag;
+      let best=45;
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone)continue;
+        if(!o.party||!p.party||o.party!==p.party)continue;
+        const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;targetId=pid2;} }
+    }
+    if(!targetId){ sendTo(id,{t:'toast',text:'Cần nhắm trúng 1 đồng đội cùng tổ đội'}); return; }
+    p.tacticalPullT=sk.delay; p.tacticalPullTargetId=targetId; p.tacticalPullDist=sk.pullDist;
+    fxEv('ring',players[targetId].x,players[targetId].y,45,0,0,25);
+  }
+  else if(sk.type==='horsecharge'){
+    const fa=Math.atan2(p.fy,p.fx);
+    const startX=p.x, startY=p.y;
+    p.x+=p.fx*sk.len; p.y+=p.fy*sk.len; clampPos(p); p.iframe=Math.max(p.iframe||0,0.3);
+    const dmg=applyPassiveOnHit(p,id,null,(sk.dmg+POW(p))*mul);
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
+      const dx=e.x-startX,dy=e.y-startY;
+      const fwd=dx*Math.cos(fa)+dy*Math.sin(fa), side=-dx*Math.sin(fa)+dy*Math.cos(fa);
+      if(fwd<0||fwd>sk.len||Math.abs(side)>sk.width/2)continue;
+      hurtEnemy(e,dmg,id);
+      const pushSign=side>=0?1:-1;
+      e.x+=(-Math.sin(fa)*pushSign)*sk.pushDist; e.y+=(Math.cos(fa)*pushSign)*sk.pushDist; clampEnemyPos(e);
+    }
+    for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.iframe>0||o.zone!==p.zone||zoneOf(o).safe)continue;
+      const dx=o.x-startX,dy=o.y-startY;
+      const fwd=dx*Math.cos(fa)+dy*Math.sin(fa), side=-dx*Math.sin(fa)+dy*Math.cos(fa);
+      if(fwd<0||fwd>sk.len||Math.abs(side)>sk.width/2)continue;
+      hurtPlayer(o,dmg*PVP,id);
+      const pushSign=side>=0?1:-1;
+      o.x+=(-Math.sin(fa)*pushSign)*sk.pushDist; o.y+=(Math.cos(fa)*pushSign)*sk.pushDist; clampPos(o);
+    }
+    fxEv('horsecharge',p.x,p.y,45,startX,startY,sk.width);
+  }
+  else if(sk.type==='cmdsacrifice'){
+    if(!p.summon){ sendTo(id,{t:'toast',text:'Cần triệu hồi Cấm Vệ Quân trước khi hi sinh'}); return; }
+    p.summon.expireT=Math.max(1,p.summon.expireT-sk.durCost);
+    for(const pid2 in players){const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone)continue;
+      if(pid2!==id && (!o.party||!p.party||o.party!==p.party))continue;
+      o.hp=Math.min(o.maxhp,o.hp+sk.healBurst); o.sacrificeAtkBuf=sk.atkBuf; o.sacrificeAtkBufT=sk.dur;
+    }
+    fxEv('sacrifice',p.x,p.y,45,0,0,60);
+  }
+  else if(sk.type==='soulledger'){
+    const frags=p.soulFrags||0;
+    if(frags<=0){ sendTo(id,{t:'toast',text:'Chưa có mảnh hồn — hạ địch gần đó để thu thập trước'}); return; }
+    p.soulFrags=0;
+    p.hp=Math.min(p.maxhp,p.hp+frags*sk.healPerFrag);
+    p.soulBuf=frags*sk.buffPerFrag; p.soulBufT=6;
+    fxEv('soulburst',p.x,p.y,280,0,0,40+frags*4);
+  }
+  else if(sk.type==='emperorswill'){
+    if((p.authority||0)<sk.authCost)return; p.authority-=sk.authCost;
+    p.commandStateT=sk.dur; p.commandStateSummonBuf=sk.summonBuf; p.commandStateBannerBuf=sk.bannerBuf; p.commandStateAuraBuf=sk.auraBuf;
+    fxEv('rally',p.x,p.y,280,0,0,180);
+  }
+  else if(sk.type==='blinkcut'){
+    const stance=getStance(p);
+    if(stance==='arcane'){
+      p.x+=p.fx*sk.distArcane; p.y+=p.fy*sk.distArcane; clampPos(p); p.iframe=Math.max(p.iframe||0,0.25);
+      p.arcane=Math.min(100,(p.arcane||0)+6);
+      fxEv('dash',p.x,p.y,270,p.fx,p.fy,0);
+    } else {
+      const isHybrid=(stance==='hybrid');
+      const dist=isHybrid?(sk.distBlade+sk.distArcane)/2:sk.distBlade;
+      const dmul=isHybrid?0.6:1;
+      const startX=p.x,startY=p.y;
+      p.x+=p.fx*dist; p.y+=p.fy*dist; clampPos(p); p.iframe=Math.max(p.iframe||0,0.25);
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgBlade*dmul+POW(p)*dmul)*mul);
+      const fa=Math.atan2(p.fy,p.fx);
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
+        const dx=e.x-startX,dy=e.y-startY;
+        const fwd=dx*Math.cos(fa)+dy*Math.sin(fa), side=-dx*Math.sin(fa)+dy*Math.cos(fa);
+        if(fwd>=0&&fwd<=dist&&Math.abs(side)<=30) hurtEnemy(e,dmg,id);
+      }
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.iframe>0||o.zone!==p.zone||zoneOf(o).safe)continue;
+        const dx=o.x-startX,dy=o.y-startY;
+        const fwd=dx*Math.cos(fa)+dy*Math.sin(fa), side=-dx*Math.sin(fa)+dy*Math.cos(fa);
+        if(fwd>=0&&fwd<=dist&&Math.abs(side)<=30) hurtPlayer(o,dmg*PVP,id);
+      }
+      if(isHybrid){ p.momentum=Math.min(100,(p.momentum||0)+3); p.arcane=Math.min(100,(p.arcane||0)+3); }
+      else p.momentum=Math.min(100,(p.momentum||0)+6);
+      fxEv('dash',p.x,p.y,isHybrid?100:15,p.fx,p.fy,0);
+    }
+  }
+  else if(sk.type==='arcslash'){
+    const stance=getStance(p);
+    if(stance==='arcane'){
+      const a=Math.atan2(p.fy,p.fx);
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgArcane+POW(p))*mul);
+      bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*560,vy:Math.sin(a)*560,life:sk.rangeArcane/560,dmg,curDmg:dmg,owner:id,hue:270,kind:'bolt',r:7});
+      p.arcane=Math.min(100,(p.arcane||0)+8);
+      fxEv('swing',p.x,p.y,270,p.fx,p.fy,0);
+    } else {
+      const isHybrid=(stance==='hybrid');
+      const rangeUse=isHybrid?sk.range*0.7:sk.range;
+      const arcUse=isHybrid?sk.arc*0.8:sk.arc;
+      const fa=Math.atan2(p.fy,p.fx);
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgBlade+POW(p))*mul*(isHybrid?0.8:1));
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
+        const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy); if(d>rangeUse)continue;
+        const ang=Math.atan2(dy,dx); let df=Math.abs(ang-fa); if(df>Math.PI)df=2*Math.PI-df; if(df>arcUse)continue;
+        hurtEnemy(e,dmg,id);
+      }
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.iframe>0||o.zone!==p.zone||zoneOf(o).safe)continue;
+        const dx=o.x-p.x,dy=o.y-p.y,d=Math.hypot(dx,dy); if(d>rangeUse)continue;
+        const ang=Math.atan2(dy,dx); let df=Math.abs(ang-fa); if(df>Math.PI)df=2*Math.PI-df; if(df>arcUse)continue;
+        hurtPlayer(o,dmg*PVP,id);
+      }
+      if(isHybrid){
+        const dmg2=applyPassiveOnHit(p,id,null,(sk.dmgArcane*0.4+POW(p)*0.4)*mul);
+        bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(fa)*560,vy:Math.sin(fa)*560,life:0.7,dmg:dmg2,curDmg:dmg2,owner:id,hue:270,kind:'bolt',r:6});
+        p.momentum=Math.min(100,(p.momentum||0)+4); p.arcane=Math.min(100,(p.arcane||0)+4);
+      } else p.momentum=Math.min(100,(p.momentum||0)+8);
+      fxEv('swing',p.x,p.y,isHybrid?100:15,p.fx,p.fy,0);
+    }
+  }
   else if(sk.type==='cone'){
     let fbonus=1;
     if(p.cls==='war'){fbonus=1+((p.fervor||0)*0.005); p.fervor=0;}
@@ -2770,6 +2960,8 @@ function hurtEnemy(e,dmg,byId){ const shredS=getStatus(e,'shred'); if(shredS)dmg
   }
   e.hp-=dmg; e.lastHit=byId; hitEv(e.x,e.y-(e.boss?34:16),dmg,true);
   if(e.hp<=0){e.dead=true;e.respawnT=e.boss?20:1.6;
+    for(const pidS in players){const ps=players[pidS]; if(!ps.chosen||ps.dead||ps.cls!=='cmd'||ps.zone!==e.zone)continue;
+      if(Math.hypot(ps.x-e.x,ps.y-e.y)<300){ ps.soulFrags=Math.min(10,(ps.soulFrags||0)+1); } }
     const killer=players[e.lastHit];
     if(killer){ gainXP(killer, e.xp||24);
       const gbonus = killer.guild && guilds[killer.guild] ? Math.min(20,guilds[killer.guild].level*2) : 0;
@@ -3259,6 +3451,20 @@ setInterval(()=>{
     if(p.cls==='cmd') p.authority=Math.min(100,(p.authority||0)+4*dt);
     if(p.decreeBuffT>0){ p.decreeBuffT-=dt; if(p.decreeBuffT<=0){ p.decreeAtkBuf=0; p.decreeDefBuf=0; } }
     if(p.decreeDebuffT>0){ p.decreeDebuffT-=dt; if(p.decreeDebuffT<=0) p.decreeDebuffMul=1; }
+    if(p.sacrificeAtkBufT>0){ p.sacrificeAtkBufT-=dt; if(p.sacrificeAtkBufT<=0)p.sacrificeAtkBuf=0; }
+    if(p.soulBufT>0){ p.soulBufT-=dt; if(p.soulBufT<=0)p.soulBuf=0; }
+    if(p.commandStateT>0)p.commandStateT-=dt;
+    if(p.tacticalPullT>0){ p.tacticalPullT-=dt;
+      if(p.tacticalPullT<=0){ const tgt=players[p.tacticalPullTargetId];
+        if(tgt && tgt.chosen && !tgt.dead && tgt.zone===p.zone && tgt.iframe<=0){
+          const dx=p.x-tgt.x, dy=p.y-tgt.y, dd=Math.hypot(dx,dy)||1;
+          const pd=Math.min(p.tacticalPullDist||150, dd);
+          tgt.x+=(dx/dd)*pd; tgt.y+=(dy/dd)*pd; clampPos(tgt);
+          fxEv('dash',tgt.x,tgt.y,45,0,0,0);
+        }
+        p.tacticalPullTargetId=null;
+      }
+    }
     if(p.cls==='mage' && p.arcaneStateT>0){ p.arcaneStateT-=dt; if(p.arcaneStateT<=0)p.arcaneState=null; }
     if(p.cls==='arc' && p.focus>0 && p.hurtT>3){ p.focus=Math.max(0,p.focus-6*dt); }
     if(p.cls==='blade' && p.hurtT>3){ if(p.momentum>0)p.momentum=Math.max(0,p.momentum-5*dt); if(p.arcane>0)p.arcane=Math.max(0,p.arcane-5*dt); }
@@ -3389,15 +3595,16 @@ setInterval(()=>{
   for(let i=illusions.length-1;i>=0;i--){ illusions[i].life-=dt; if(illusions[i].life<=0) illusions.splice(i,1); }
   for(const pid3 in players){ players[pid3].bannerAtkBuf=0; players[pid3].bannerDefBuf=0; }
   for(let i=banners.length-1;i>=0;i--){const bn=banners[i]; bn.life-=dt;
+    const ownerP2=players[bn.owner]; const willBoost=(ownerP2 && ownerP2.commandStateT>0)?(1+(ownerP2.commandStateBannerBuf||0)):1;
     for(const pid3 in players){const o=players[pid3]; if(!o.chosen||o.dead||o.zone!==bn.zone)continue;
-      if(Math.hypot(o.x-bn.x,o.y-bn.y)<=bn.radius){ o.bannerAtkBuf=Math.max(o.bannerAtkBuf||0,bn.atkBuf); o.bannerDefBuf=Math.max(o.bannerDefBuf||0,bn.defBuf); } }
+      if(Math.hypot(o.x-bn.x,o.y-bn.y)<=bn.radius){ o.bannerAtkBuf=Math.max(o.bannerAtkBuf||0,bn.atkBuf*willBoost); o.bannerDefBuf=Math.max(o.bannerDefBuf||0,bn.defBuf*willBoost); } }
     if(bn.life<=0) banners.splice(i,1);
   }
   const psPublic={}; for(const id in players){const p=players[id];if(!p.chosen)continue;
     try{
       psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,
         spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0),
-        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),
+        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),sacrificeBuf:(p.sacrificeAtkBufT>0),soulBuf:(p.soulBufT>0),willActive:(p.commandStateT>0),
         slowed:(p.slowT>0&&(p.slowMul||1)>=0.15),rooted:(p.slowT>0&&(p.slowMul||1)<0.15)};
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
@@ -3435,4 +3642,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.80 (/set admin linh hoạt lv 99) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.82 (Blade batch 1: nền stance + 2 skill) chạy ở cổng '+PORT));
