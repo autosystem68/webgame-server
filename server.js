@@ -617,7 +617,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.90 · Blade: stance hóa toàn bộ b3-b8</div>
+  <div id="ver">v0.91 · vận động vật lý khác biệt thật 2 stance</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1360,7 +1360,7 @@ var chargeState={active:false,slot:null,startT:0};
 var comboPrompt={active:false,slot:null,until:0};
 var echoMark={active:false,x:0,y:0,zone:'',maxDist:500,until:0};
 var myBladeStance='blade';
-var FX_DUR={enchok:0.6,enchfail:0.6,starfall:0.9,bigswing:0.5,raven:0.55,orderflag:0.5,plantflag:0.8,rally:0.7,horsecharge:0.4,ravenscout:0.6,sacrifice:0.5,soulburst:0.6,swapblade:0.4,swaparcane:0.4};
+var FX_DUR={enchok:0.6,enchfail:0.6,starfall:0.9,bigswing:0.5,raven:0.55,orderflag:0.5,plantflag:0.8,rally:0.7,horsecharge:0.4,ravenscout:0.6,sacrifice:0.5,soulburst:0.6,swapblade:0.4,swaparcane:0.4,phaseslash:0.35,arcblink:0.4};
 var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
 function isChannelable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].channelable; } return false; }
@@ -1575,6 +1575,32 @@ function frame(now){
         ctx.globalAlpha=(f.life/f.max)*0.85;ctx.font='13px serif';ctx.textAlign='center';ctx.fillText('🐦',rx2,ry2); }
       ctx.globalAlpha=(f.life/f.max)*0.15;ctx.strokeStyle='#8ad6ff';ctx.lineWidth=1.5;ctx.setLineDash([3,8]);
       ctx.beginPath();ctx.arc(f.x,f.y,f.R||280,0,7);ctx.stroke();ctx.setLineDash([]);
+      ctx.restore();
+    }
+    else if(f.kind==='phaseslash'){
+      ctx.save();ctx.globalAlpha=(f.life/f.max);ctx.strokeStyle='#ff8a5a';ctx.lineWidth=9;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(f.fx,f.fy);ctx.stroke();
+      ctx.globalAlpha=(f.life/f.max)*0.6;ctx.lineWidth=4;ctx.strokeStyle='#ffe0b0';
+      var pa=Math.atan2(f.fy-f.y,f.fx-f.x);
+      for(var psi=0;psi<3;psi++){ var pt=(psi+1)/4;
+        var mx=f.x+(f.fx-f.x)*pt, my=f.y+(f.fy-f.y)*pt;
+        ctx.beginPath();ctx.moveTo(mx-Math.cos(pa+1.3)*10,my-Math.sin(pa+1.3)*10);ctx.lineTo(mx+Math.cos(pa+1.3)*10,my+Math.sin(pa+1.3)*10);ctx.stroke(); }
+      ctx.restore();
+    }
+    else if(f.kind==='arcblink'){
+      ctx.save();
+      var abT=t;
+      if(abT<0.5){ var shatterT=abT/0.5;
+        ctx.globalAlpha=(f.life/f.max)*(1-shatterT);
+        for(var abi=0;abi<6;abi++){ var abang=abi*1.05;
+          ctx.fillStyle='#c9a8ff';ctx.beginPath();ctx.arc(f.x+Math.cos(abang)*shatterT*22,f.y+Math.sin(abang)*shatterT*22,3,0,7);ctx.fill(); }
+      } else { var reformT=(abT-0.5)/0.5;
+        ctx.globalAlpha=(f.life/f.max)*reformT;
+        for(var abi2=0;abi2<6;abi2++){ var abang2=abi2*1.05;
+          ctx.fillStyle='#c9a8ff';ctx.beginPath();ctx.arc(f.fx+Math.cos(abang2)*(1-reformT)*22,f.fy+Math.sin(abang2)*(1-reformT)*22,3,0,7);ctx.fill(); }
+        ctx.globalAlpha=(f.life/f.max)*reformT*0.5;ctx.strokeStyle='#c9a8ff';ctx.lineWidth=2;
+        ctx.beginPath();ctx.arc(f.fx,f.fy,14*reformT,0,7);ctx.stroke();
+      }
       ctx.restore();
     }
     else if(f.kind==='swapblade'||f.kind==='swaparcane'){
@@ -2116,6 +2142,8 @@ wss.on('connection',(ws)=>{
       if((p.stanceSwapCd||0)>0)return;
       p.bladeStance=(p.bladeStance==='arcane')?'blade':'arcane';
       p.stanceSwapCd=0.6;
+      if(p.bladeStance==='blade'){ p.x+=p.fx*18; p.y+=p.fy*18; } else { p.x-=p.fx*14; p.y-=p.fy*14; }
+      clampPos(p);
       fxEv(p.bladeStance==='arcane'?'swaparcane':'swapblade',p.x,p.y,p.bladeStance==='arcane'?270:15,0,0,40);
       sendTo(id,{t:'stance',stance:p.bladeStance});
     }
@@ -2251,7 +2279,7 @@ const SKILLS = {
   ],
   blade:[
     {id:'b1',name:'Chớp Cắt',   icon:'💨',type:'blinkcut', mp:10,cd:2.0, unlockLv:2,  distBlade:110,distArcane:190,dmgBlade:22,
-      desc:'Hành vi đổi theo VŨ KHÍ đang cầm (bấm nút ⇄ để đổi): đang cầm KIẾM → lao ngắn XUYÊN QUA địch trên đường, gây dame; đang cầm PHÉP → dịch chuyển XA HƠN hẳn, không gây dame nhưng né đòn tốt hơn.'},
+      desc:'Hành vi đổi theo VŨ KHÍ đang cầm (bấm nút ⇄ để đổi): KIẾM → lao ngắn XUYÊN QUA địch trên đường (vệt chém dày, có động tác thật), gây dame. PHÉP → BIẾN MẤT tức thời rồi HIỆN LẠI ở xa hơn hẳn (không có vệt di chuyển, đúng cảm giác dịch chuyển thật, không phải chạy nhanh), không gây dame nhưng né đòn tốt hơn.'},
     {id:'b2',name:'Chém Cung',  icon:'⚔️',type:'arcslash', mp:16,cd:1.2, unlockLv:3,  range:115,arc:0.95,dmgBlade:26,rangeArcane:340,dmgArcane:24,
       desc:'Hành vi đổi theo VŨ KHÍ đang cầm: KIẾM → chém cận chiến hình quạt thật gần; PHÉP → phóng 1 lưỡi kiếm năng lượng bay xa. Đòn Kiếm (kể cả đánh thường) nuôi Momentum, đòn Phép nuôi Arcane.'},
     {id:'b3',name:'Sóng Kiếm',  icon:'🌊',type:'swordwave', mp:24,cd:3,   unlockLv:5,  dmgBlade:27,dmgArcane:22,
@@ -2407,6 +2435,7 @@ function doBasic(p,id){
   const useMelee = (p.basicType==='melee') && !bladeArcaneMode;
   if(useMelee){
     if(hit){const a=Math.atan2(hit.ent.y-p.y,hit.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);
+      if(p.cls==='blade'){ const d=Math.hypot(hit.ent.x-p.x,hit.ent.y-p.y); if(d>34){ p.x+=Math.cos(a)*Math.min(24,d-30); p.y+=Math.sin(a)*Math.min(24,d-30); clampPos(p); } }
       const fd=applyPassiveOnHit(p,id,hit.ent,dmg);
       if(hit.tp==='e')hurtEnemy(hit.ent,fd,id);else hurtPlayer(hit.ent,fd*PVP,id);
       if(p.cls==='war'){ p.fervor=Math.min(100,(p.fervor||0)+8); p.momT=0; }
@@ -2418,6 +2447,7 @@ function doBasic(p,id){
     let shotDmg=dmg; if(p.cls==='arc' && p.rhythmReady){ shotDmg*=1.25; p.rhythmReady=false; }
     const bSpd=bladeArcaneMode?540:p.basicSpd, bKind=bladeArcaneMode?'bolt':p.basicKind, bR=bladeArcaneMode?6:p.basicR, bHue=bladeArcaneMode?270:p.hue;
     bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*bSpd,vy:Math.sin(a)*bSpd,life:1.0,dmg:applyPassiveOnHit(p,id,null,shotDmg),owner:id,hue:bHue,kind:bKind,r:bR});
+    if(bladeArcaneMode && hit){ p.x-=Math.cos(a)*14; p.y-=Math.sin(a)*14; clampPos(p); } // Phép: lùi nhẹ mỗi phát — cảm giác kite thật, khác hẳn đứng yên
     if(p.cls==='arc' && hit){ p.focus=Math.min(100,(p.focus||0)+10); p.rhythmFx=p.fx; p.rhythmFy=p.fy; p.rhythmT=0.6; }
     if(p.cls==='blade') p.arcane=Math.min(100,(p.arcane||0)+6);
   }
@@ -2834,9 +2864,10 @@ function execSkill(p,id,sk,rank,step){
   else if(sk.type==='blinkcut'){
     const stance=getStance(p);
     if(stance==='arcane'){
+      const oldX=p.x,oldY=p.y;
       p.x+=p.fx*sk.distArcane; p.y+=p.fy*sk.distArcane; clampPos(p); p.iframe=Math.max(p.iframe||0,0.25);
       p.arcane=Math.min(100,(p.arcane||0)+6);
-      fxEv('dash',p.x,p.y,270,p.fx,p.fy,0);
+      fxEv('arcblink',oldX,oldY,270,p.x,p.y,0);
     } else {
       const dist=sk.distBlade;
       const startX=p.x,startY=p.y;
@@ -2854,7 +2885,7 @@ function execSkill(p,id,sk,rank,step){
         if(fwd>=0&&fwd<=dist&&Math.abs(side)<=30) hurtPlayer(o,dmg*PVP,id);
       }
       p.momentum=Math.min(100,(p.momentum||0)+6);
-      fxEv('dash',p.x,p.y,15,p.fx,p.fy,0);
+      fxEv('phaseslash',startX,startY,15,p.x,p.y,0);
     }
   }
   else if(sk.type==='arcslash'){
@@ -3830,4 +3861,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.90 (Blade: stance hóa toàn bộ b3-b8) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.91 (vận động vật lý khác biệt 2 stance) chạy ở cổng '+PORT));
