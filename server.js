@@ -617,7 +617,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.87 · fix nút đổi vũ khí bị đè khuất</div>
+  <div id="ver">v0.90 · Blade: stance hóa toàn bộ b3-b8</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1365,7 +1365,7 @@ var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
 function isChannelable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].channelable; } return false; }
 var AIMABLE_TYPES={dash:1,warcleave:1,predstep:1,groundbreak:1,pierce:1,huntmark:1,trap:1,starfall:1,windguard:1,
-  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,arcanedet:1,blooddebt:1,warlordverdict:1,ravenmark:1,cmdadvance:1,banner:1,horsecharge:1,tacticalrecall:1,blinkcut:1,arcslash:1,proj:1,cone:1,nova:1,slow:1,leap:1};
+  emberlance:1,frostprism:1,arcanethread:1,cataclysm:1,mirrorstep:1,gravitywell:1,arcanedet:1,blooddebt:1,warlordverdict:1,ravenmark:1,cmdadvance:1,banner:1,horsecharge:1,tacticalrecall:1,blinkcut:1,arcslash:1,wildhunt:1,lifesteal:1,swordwave:1,voidsword:1,bloodsword:1,proj:1,cone:1,nova:1,slow:1,leap:1};
 function isAimable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!AIMABLE_TYPES[myFull[i].type]; } return false; }
 function bindSkillBtn(id,k){
   var btn=document.getElementById(id);
@@ -1695,7 +1695,7 @@ function frame(now){
     var bw=en.boss?70:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-er-10,bw,en.boss?6:4);
     ctx.fillStyle=en.boss?'#e07ab8':'#d06a55';ctx.fillRect(en.x-bw/2,en.y-er-10,bw*Math.max(0,en.hp)/en.maxhp,en.boss?6:4);
     if(en.boss){ctx.fillStyle='#ffb0e0';ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillText('BOSS',en.x,en.y-er-16);}
-    var stIc=''; if(en.wound>0)stIc+='🩸'; if(en.shred)stIc+='💢'; if(en.weak)stIc+='📢'; if(en.marked)stIc+='🎯'; if(en.arcmarked)stIc+='🔮'; if(en.ravenmarked)stIc+='🐦'; if(en.rooted)stIc+='⛓️'; else if(en.slowed)stIc+='❄️';
+    var stIc=''; if(en.wound>0)stIc+='🩸'; if(en.shred)stIc+='💢'; if(en.weak)stIc+='📢'; if(en.marked)stIc+='🎯'; if(en.arcmarked)stIc+='🔮'; if(en.ravenmarked)stIc+='🐦'; if(en.bladefrost)stIc+='🧊'; if(en.rooted)stIc+='⛓️'; else if(en.slowed)stIc+='❄️';
     if(stIc){ ctx.font='11px serif';ctx.textAlign='center';ctx.fillText(stIc,en.x,en.y-er-(en.boss?24:16)); }}
 
   for(var li=0;li<loot.length;li++){var it=loot[li]; if(it.zone!==myZone)continue;
@@ -1793,10 +1793,17 @@ function frame(now){
     if(id==myId){ctx.strokeStyle='#ffe0a0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(rx,ry,20,0,7);ctx.stroke();}
     if(p.sh){ctx.strokeStyle='#6bc4ff';ctx.lineWidth=2;ctx.globalAlpha=0.85;ctx.beginPath();ctx.arc(rx,ry,19,0,7);ctx.stroke();ctx.globalAlpha=p.dead?0.25:1;}
     if(p.mt){ctx.save();ctx.globalAlpha=0.55;ctx.fillStyle='#5a3a1a';ctx.beginPath();ctx.ellipse(rx,ry+16,20,9,0,0,7);ctx.fill();ctx.restore();}
+    if(p.cls==='blade' && !p.dead){
+      var bsPulse=(Math.sin(performance.now()/280)+1)/2;
+      var bsCol=(p.bladeStance==='arcane')?'#a878ff':'#ff8a5a';
+      ctx.save();ctx.globalAlpha=0.55+bsPulse*0.25;ctx.strokeStyle=bsCol;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(rx,ry,17+bsPulse*1.5,0,7);ctx.stroke();
+      ctx.restore();
+    }
     ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
     ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
     ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
-    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.sacrificeBuf)pStIc+='💔'; if(p.soulBuf)pStIc+='📖'; if(p.willActive)pStIc+='👑'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
+    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.bladefrost)pStIc+='🧊'; if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.sacrificeBuf)pStIc+='💔'; if(p.soulBuf)pStIc+='📖'; if(p.willActive)pStIc+='👑'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
     if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-44); }
     ctx.globalAlpha=1;
   }
@@ -1845,7 +1852,7 @@ function frame(now){
       ctx.beginPath();ctx.moveTo(bxB,byB+16);ctx.lineTo(bxB,byB-14);ctx.stroke();
       ctx.fillStyle='#ffd76b';ctx.beginPath();ctx.moveTo(bxB,byB-14);ctx.lineTo(bxB+16,byB-9);ctx.lineTo(bxB,byB-4);ctx.closePath();ctx.fill();
       ctx.restore();
-    } else if(aimSk && (aimSk.type==='arcanedet'||aimSk.type==='blooddebt'||aimSk.type==='warlordverdict'||aimSk.type==='ravenmark'||aimSk.type==='tacticalrecall')){
+    } else if(aimSk && (aimSk.type==='arcanedet'||aimSk.type==='blooddebt'||aimSk.type==='warlordverdict'||aimSk.type==='ravenmark'||aimSk.type==='tacticalrecall'||aimSk.type==='wildhunt'||aimSk.type==='lifesteal'||aimSk.type==='bloodsword')){
       var apx0=(myPX!==null?myPX:meNow.x), apy0=(myPY!==null?myPY:meNow.y);
       var maxR0=aimSk.range||160;
       ctx.save();ctx.globalAlpha=0.22;ctx.strokeStyle='#ffb060';ctx.lineWidth=1.5;ctx.setLineDash([4,6]);
@@ -1978,6 +1985,7 @@ let crystals = [];
 let wells = [];
 let illusions = [];
 let banners = [];
+let dotZones = [];
 const sockets = {};
 let nextP = 1, nextE = 1, nextL = 1;
 
@@ -2216,8 +2224,8 @@ const SKILLS = {
       desc:'Tạo 1 vùng hút tại vị trí ngắm, tồn tại 2.5s — kẻ địch trong vùng bị kéo dần vào tâm + chịu sát thương nhỏ liên tục. Không mạnh nhưng GOM địch lại để tận dụng Tia Diệt Vong/Dây Huyền Bí ngay sau đó.'},
     {id:'m11',name:'Phong Ấn Huyền Bí',icon:'🔮',type:'arcanedet', mp:20,cd:8, unlockLv:29, range:400,dur:6,bonusPct:0.5,
       desc:'GIỮ để hiện hồng tâm riêng tư, KÉO TỰ DO trong tầm ngắm tới đúng mục tiêu (sáng vàng khi đã khóa đúng) rồi thả tay — không gây sát thương ngay. Đòn phép TIẾP THEO đánh trúng mục tiêu đã đóng dấu sẽ +50% sát thương và tiêu luôn dấu. Chọn chuẩn xác tuyệt đối — quan trọng cho PK.'},
-    {id:'m12',name:'Chuyển Hệ',  icon:'♻️',type:'elemshift', mp:10,cd:5, unlockLv:32,
-      desc:'Chủ động đổi hệ Nguyên Tố hiện tại sang hệ TIẾP THEO trong vòng Lửa→Băng→Huyền Bí→Lửa — dùng để tự tạo phản ứng combo mà không cần đổi skill, tốn ít mana, hồi chiêu ngắn.'},
+    {id:'m12',name:'Chuyển Hệ',  icon:'♻️',type:'elemshift', mp:20,cd:8, unlockLv:32,
+      desc:'Chủ động đổi hệ Nguyên Tố hiện tại sang hệ TIẾP THEO trong vòng Lửa→Băng→Huyền Bí→Lửa — dùng để tự tạo phản ứng combo mà không cần đổi skill.'},
   ],
   arc: [
     {id:'a1',name:'Bước Ma',    icon:'💨',type:'dash', mp:10,cd:2.0, unlockLv:2,  dist:150,
@@ -2246,12 +2254,18 @@ const SKILLS = {
       desc:'Hành vi đổi theo VŨ KHÍ đang cầm (bấm nút ⇄ để đổi): đang cầm KIẾM → lao ngắn XUYÊN QUA địch trên đường, gây dame; đang cầm PHÉP → dịch chuyển XA HƠN hẳn, không gây dame nhưng né đòn tốt hơn.'},
     {id:'b2',name:'Chém Cung',  icon:'⚔️',type:'arcslash', mp:16,cd:1.2, unlockLv:3,  range:115,arc:0.95,dmgBlade:26,rangeArcane:340,dmgArcane:24,
       desc:'Hành vi đổi theo VŨ KHÍ đang cầm: KIẾM → chém cận chiến hình quạt thật gần; PHÉP → phóng 1 lưỡi kiếm năng lượng bay xa. Đòn Kiếm (kể cả đánh thường) nuôi Momentum, đòn Phép nuôi Arcane.'},
-    {id:'b3',name:'Sóng Kiếm',  icon:'🌊',type:'proj', mp:24,cd:3,   unlockLv:5,  count:3,spread:0.4,dmg:27,speed:520,r:7},
-    {id:'b4',name:'Vũ Bão',     icon:'🌀',type:'nova', mp:55,cd:12,  unlockLv:7,  radius:185,dmg:82},
-    {id:'b5',name:'Kiếm Hút Sinh',icon:'🩸',type:'lifesteal',mp:18,cd:3.5,unlockLv:10,range:105,dmg:28,lsPct:0.55, reqStat:'STR',reqVal:12},
-    {id:'b6',name:'Hộ Thể Quyết',icon:'🛡️',type:'shield',mp:22,cd:9, unlockLv:13, amount:65,dur:5, reqStat:'INT',reqVal:15},
-    {id:'b7',name:'Băng Kiếm',  icon:'❄️',type:'slow', mp:24,cd:8,   unlockLv:16, radius:120,dmg:22,slowMul:0.5,slowDur:2.5},
-    {id:'b8',name:'Kiếm Phá Không',icon:'⚡',type:'leap',mp:30,cd:10,unlockLv:20, dist:210,dmg:48,impactR:95},
+    {id:'b3',name:'Sóng Kiếm',  icon:'🌊',type:'swordwave', mp:24,cd:3,   unlockLv:5,  dmgBlade:27,dmgArcane:22,
+      desc:'Kiếm: 3 sóng cận chiến ngắn liên tiếp, spread hẹp, nuôi Momentum mạnh. Phép: 3 tia năng lượng bay XA, xuyên nhẹ 2 mục tiêu, nuôi Arcane.'},
+    {id:'b4',name:'Vũ Bão',     icon:'🌀',type:'stormblade', mp:55,cd:12,  unlockLv:7,  dmgBlade:82,dmgArcane:60,radius:185,
+      desc:'ULTIMATE thường. Kiếm: nova cận chiến cực lớn + hút 15% dame thành máu. Phép: nova tầm nhỏ hơn + hồi 25% mana tối đa + làm chậm mọi mục tiêu trúng.'},
+    {id:'b5',name:'Kiếm Hút Sinh',icon:'🩸',type:'bloodsword',mp:18,cd:3.5,unlockLv:10,rangeBlade:105,dmgBlade:28,lsBlade:0.55,rangeArcane:220,dmgArcane:22,lsArcane:0.3, reqStat:'STR',reqVal:12,
+      desc:'Nhánh STR (Kiếm mạnh hơn hẳn ở đây). Kiếm: tầm ngắn, hút máu 55%. Phép: tầm xa gấp đôi nhưng hút máu chỉ 30%, bù lại gây thêm Bỏng nhẹ theo thời gian.'},
+    {id:'b6',name:'Hộ Thể Quyết',icon:'🛡️',type:'bodyward', mp:22,cd:9, unlockLv:13, amountBlade:65,reflectPct:0.2,amountArcane:50,manaShieldPct:0.5,dur:5, reqStat:'INT',reqVal:15,
+      desc:'Nhánh INT (Phép mạnh hơn hẳn ở đây). Kiếm: khiên hấp thụ + phản 20% dame về kẻ đánh. Phép: khiên yếu hơn nhưng khi vỡ chuyển 50% phần còn dư thành Mana ngay lập tức.'},
+    {id:'b7',name:'Băng Kiếm',  icon:'❄️',type:'iceblade', mp:24,cd:8,   unlockLv:16, radius:120,dmgBlade:22,dmgArcane:18,slowMul:0.5,slowDur:2.5,
+      desc:'Kiếm: làm chậm + gây Wound (cộng dồn với các đòn Kiếm khác). Phép: làm chậm + đóng dấu Frostmark riêng của Phép (tăng dame nhận từ đòn Phép tiếp theo).'},
+    {id:'b8',name:'Kiếm Phá Không',icon:'⚡',type:'voidsword',mp:30,cd:10,unlockLv:20, distBlade:210,dmgBlade:48,impactR:95,distArcane:260,dmgArcane:30,zoneDur:3,
+      desc:'Kiếm: nhảy bổ xuống, va chạm gây nổ lớn tức thì. Phép: dịch chuyển xa hơn, va chạm nhẹ hơn nhưng để lại 1 VÙNG DAME liên tục 3s tại điểm đáp.'},
   ],
   // Thống Lĩnh — "Chỉ Huy" lai giữa Dark Lord (xích, áp chế) và support (1 skill hồi máu duy nhất, không phải class heal chính)
   cmd: [
@@ -2272,13 +2286,13 @@ const SKILLS = {
     {id:'c9',name:'Sổ Linh Hồn', icon:'📖',type:'soulledger', mp:20,cd:10, unlockLv:12, fragCap:10,healPerFrag:14,buffPerFrag:0.02,
       desc:'Thụ động: mỗi khi có địch chết gần bạn (bất kỳ ai hạ), bạn nhặt được 1 "mảnh hồn" (tối đa 10). Chủ động bấm skill này: TIÊU TOÀN BỘ mảnh đã gom để hồi máu lớn + tăng sát thương ngắn hạn — gom càng nhiều, nổ càng mạnh.'},
     {id:'c10',name:'Ý Chí Hoàng Đế',icon:'👑',type:'emperorswill',mp:70,cd:45, unlockLv:35, dur:8,summonBuf:0.5,bannerBuf:0.5,auraBuf:0.5,authCost:40,
-      desc:'ULTIMATE thứ 2 — mở Trạng Thái Chỉ Huy Tối Cao 8s: Cấm Vệ Quân +50% sát thương/tốc đánh, mọi Cờ Hiệu đang tồn tại +50% hiệu quả buff, hào quang Command +50%. Không tự đánh mạnh hơn — SỨC MẠNH NẰM Ở NHỮNG GÌ BẠN ĐIỀU KHIỂN, đúng cốt lõi triết lý Thống Lĩnh.'},
+      desc:'ULTIMATE nhánh Beast Commander (build dồn Cấm Vệ Quân/Cờ Hiệu, đầu tư nặng c2/c4/c11/c12) — mở Trạng Thái Chỉ Huy Tối Cao 8s: Cấm Vệ Quân +50% sát thương/tốc đánh, mọi Cờ Hiệu đang tồn tại +50% hiệu quả buff, hào quang Command +50%. Không tự đánh mạnh hơn — chọn ultimate này nếu lối chơi của bạn xoay quanh điều khiển, không phải tự combat.'},
     {id:'c11',name:'Lệnh: Xung Phong',icon:'🐎',type:'cmdadvance', mp:20,cd:11, unlockLv:23, range:320,orderRange:320,orderHoldDur:2.5,authCost:20,sweepDmg:14,sweepR:55,
       desc:'GIỮ rồi kéo tới điểm muốn ra lệnh (giới hạn theo khoảng cách TỪ CHÍNH Cấm Vệ Quân, không phải từ bạn) — nhắm TRÚNG 1 kẻ địch thì Cấm Vệ Quân sẽ ĐUỔI THEO nó dù nó di chuyển, nhắm vị trí trống thì lao thẳng tới đó. Trên đường lao đi gây sát thương mọi địch chạm phải. Tới nơi: đứng lại 2.5s với giáo DÀI HƠN + đánh nhanh hơn hẳn. Hết giờ: LAO VỀ lại phía bạn — trên đường về TIẾP TỤC gây sát thương.'},
     {id:'c12',name:'Cờ Hiệu Đế Vương',icon:'🚩',type:'banner', mp:38,cd:18, unlockLv:29, range:260,radius:150,life:8,atkBuf:0.15,defBuf:0.12,authCost:15,
       desc:'GIỮ rồi kéo tới vị trí đặt cờ — cờ hạ xuống từ trên trời, cắm đất có bụi bay (khác hẳn nhịp nhanh của Xung Phong). Tồn tại 8s — đồng đội (kể cả Cấm Vệ Quân/pet) đứng trong vùng được +15% sát thương, +12% giảm dame nhận.'},
     {id:'c13',name:'Sắc Lệnh Quân Đoàn',icon:'📣',type:'legiondecree', mp:60,cd:35, unlockLv:32, radius:220,dur:5,atkBuf:0.25,defBuf:0.15,enemyDebuf:0.2,authCost:45,
-      desc:'ULTIMATE — rúc tù và triệu tập, KHÔNG cần ngắm (tự kích hoạt quanh mình ngay). Trong bán kính 220 quanh bạn, 5s: đồng đội +25% sát thương/+15% giảm dame nhận, ĐỊCH bị -20% sát thương gây ra. Chấn động toàn khu vực — thời khắc quyết định trận đánh.'},
+      desc:'ULTIMATE nhánh Overlord (build combat trực tiếp + team fight, đầu tư nặng c7/aura Chỉ Huy) — rúc tù và triệu tập, KHÔNG cần ngắm (tự kích hoạt quanh mình ngay). Bán kính 220 quanh bạn, 5s: đồng đội +25% sát thương/+15% giảm dame nhận, ĐỊCH bị -20% sát thương gây ra. Chọn ultimate này nếu bạn muốn đứng giữa trận đánh trực tiếp, khác hẳn lối chơi thuần điều khiển của Ý Chí Hoàng Đế.'},
   ],
 };
 // ---- PASSIVE nội tại riêng từng class (LOL-signature style) ----
@@ -2600,7 +2614,14 @@ function execSkill(p,id,sk,rank,step){
     fxEv('ring',p.x,p.y,150,0,0,50);
   }
   else if(sk.type==='wildhunt'){
-    const hit=nearestHostile(p,id,sk.range);
+    let hit=null;
+    if(p.wasAimed){
+      const ax=p.x+p.fx*sk.range*p.aimMag, ay=p.y+p.fy*sk.range*p.aimMag;
+      let best=40,bestEnt=null,bestTp=null;
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ax,e.y-ay); if(d<best){best=d;bestEnt=e;bestTp='e';}}
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
+      if(bestEnt) hit={ent:bestEnt,tp:bestTp};
+    } else hit=nearestHostile(p,id,sk.range);
     if(hit){ p.wildHuntTargetObj=hit.ent; p.wildHuntT=sk.dur; p.aspdBonusWH=sk.aspdBonus;
       addStatus(hit.ent,'huntmark',{dur:sk.dur,data:{bonus:0.3}});
       fxEv('nova',hit.ent.x,hit.ent.y,120,0,0,60); }
@@ -2861,6 +2882,113 @@ function execSkill(p,id,sk,rank,step){
       fxEv('swing',p.x,p.y,15,p.fx,p.fy,0);
     }
   }
+  else if(sk.type==='swordwave'){
+    const stance=getStance(p);
+    const fa=Math.atan2(p.fy,p.fx);
+    if(stance==='arcane'){
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgArcane+POW(p))*mul);
+      for(let i=0;i<3;i++){ const a=fa+(i-1)*0.22;
+        bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*580,vy:Math.sin(a)*580,life:1.1,dmg,curDmg:dmg,pierce:2,falloff:0.75,owner:id,hue:270,kind:'bolt',r:6}); }
+      p.arcane=Math.min(100,(p.arcane||0)+9);
+      fxEv('swing',p.x,p.y,270,p.fx,p.fy,0);
+    } else {
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgBlade+POW(p))*mul);
+      for(let i=0;i<3;i++){ const a=fa+(i-1)*0.35;
+        for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue;
+          const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy); if(d>90)continue;
+          const ang=Math.atan2(dy,dx); let df=Math.abs(ang-a); if(df>Math.PI)df=2*Math.PI-df; if(df>0.22)continue;
+          hurtEnemy(e,dmg,id); }
+        for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.iframe>0||o.zone!==p.zone||zoneOf(o).safe)continue;
+          const dx=o.x-p.x,dy=o.y-p.y,d=Math.hypot(dx,dy); if(d>90)continue;
+          const ang=Math.atan2(dy,dx); let df=Math.abs(ang-a); if(df>Math.PI)df=2*Math.PI-df; if(df>0.22)continue;
+          hurtPlayer(o,dmg*PVP,id); } }
+      p.momentum=Math.min(100,(p.momentum||0)+9);
+      fxEv('swing',p.x,p.y,15,p.fx,p.fy,0);
+    }
+  }
+  else if(sk.type==='stormblade'){
+    const stance=getStance(p);
+    if(stance==='arcane'){
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgArcane+POW(p))*mul);
+      aoe(p,sk.radius*0.75,dmg,id,0.5,2.5);
+      p.mp=Math.min(p.maxmp,p.mp+p.maxmp*0.25);
+      p.arcane=Math.min(100,(p.arcane||0)+15);
+      fxEv('nova',p.x,p.y,270,0,0,sk.radius*0.75);
+    } else {
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgBlade+POW(p))*mul);
+      aoe(p,sk.radius,dmg,id);
+      p.hp=Math.min(p.maxhp,p.hp+dmg*0.15);
+      p.momentum=Math.min(100,(p.momentum||0)+15);
+      fxEv('nova',p.x,p.y,15,0,0,sk.radius);
+    }
+  }
+  else if(sk.type==='bloodsword'){
+    const stance=getStance(p);
+    let h=null; const rng=(stance==='arcane')?sk.rangeArcane:sk.rangeBlade;
+    if(p.wasAimed){
+      const ax=p.x+p.fx*rng*p.aimMag, ay=p.y+p.fy*rng*p.aimMag;
+      let best=40,bestEnt=null,bestTp=null;
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ax,e.y-ay); if(d<best){best=d;bestEnt=e;bestTp='e';}}
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
+      if(bestEnt) h={ent:bestEnt,tp:bestTp};
+    } else h=nearestHostile(p,id,rng);
+    if(h){
+      const a=Math.atan2(h.ent.y-p.y,h.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);
+      if(stance==='arcane'){
+        const dmg=applyPassiveOnHit(p,id,null,(sk.dmgArcane+POW(p))*mul);
+        if(h.tp==='e')hurtEnemy(h.ent,dmg,id); else hurtPlayer(h.ent,dmg*PVP,id);
+        const heal=Math.round(dmg*sk.lsArcane); p.hp=Math.min(p.maxhp,p.hp+heal); hitEv(p.x,p.y-20,heal,true);
+        addStatus(h.ent,'burn',{dur:3,data:{dmgPerTick:dmg*0.08,tickInt:1,ownerId:id}});
+        p.arcane=Math.min(100,(p.arcane||0)+8);
+      } else {
+        const dmg=applyPassiveOnHit(p,id,null,(sk.dmgBlade+POW(p))*mul);
+        if(h.tp==='e')hurtEnemy(h.ent,dmg,id); else hurtPlayer(h.ent,dmg*PVP,id);
+        const heal=Math.round(dmg*sk.lsBlade); p.hp=Math.min(p.maxhp,p.hp+heal); hitEv(p.x,p.y-20,heal,true);
+        p.momentum=Math.min(100,(p.momentum||0)+8);
+      }
+    }
+    fxEv('swing',p.x,p.y,stance==='arcane'?270:340,p.fx,p.fy,0);
+  }
+  else if(sk.type==='bodyward'){
+    const stance=getStance(p);
+    if(stance==='arcane'){
+      p.shieldHP=sk.amountArcane*mul; p.shieldT=sk.dur; p.shieldManaMode=true; p.shieldOrigAmount=p.shieldHP; p.shieldReflect=0;
+      p.arcane=Math.min(100,(p.arcane||0)+6);
+    } else {
+      p.shieldHP=sk.amountBlade*mul; p.shieldT=sk.dur; p.shieldReflect=sk.reflectPct; p.shieldManaMode=false;
+      p.momentum=Math.min(100,(p.momentum||0)+6);
+    }
+    fxEv('ring',p.x,p.y,stance==='arcane'?270:15,0,0,50);
+  }
+  else if(sk.type==='iceblade'){
+    const stance=getStance(p);
+    const dmg=applyPassiveOnHit(p,id,null,((stance==='arcane'?sk.dmgArcane:sk.dmgBlade)+POW(p))*mul);
+    for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; if(Math.hypot(e.x-p.x,e.y-p.y)>sk.radius)continue;
+      hurtEnemy(e,dmg,id); e.slowT=sk.slowDur; e.slowMul=sk.slowMul;
+      if(stance==='arcane') addStatus(e,'bladefrost',{dur:3,data:{bonus:0.2}}); else addStatus(e,'wound',{stacks:1,dur:6,maxStacks:5}); }
+    for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.iframe>0||o.zone!==p.zone||zoneOf(o).safe)continue; if(Math.hypot(o.x-p.x,o.y-p.y)>sk.radius)continue;
+      hurtPlayer(o,dmg*PVP,id); o.slowT=sk.slowDur; o.slowMul=sk.slowMul;
+      if(stance==='arcane') addStatus(o,'bladefrost',{dur:3,data:{bonus:0.2}}); else addStatus(o,'wound',{stacks:1,dur:6,maxStacks:5}); }
+    if(stance==='arcane') p.arcane=Math.min(100,(p.arcane||0)+8); else p.momentum=Math.min(100,(p.momentum||0)+8);
+    fxEv('nova',p.x,p.y,stance==='arcane'?270:15,0,0,sk.radius);
+  }
+  else if(sk.type==='voidsword'){
+    const stance=getStance(p);
+    const dist=(stance==='arcane')?sk.distArcane:sk.distBlade;
+    p.x+=p.fx*dist; p.y+=p.fy*dist; clampPos(p); p.iframe=Math.max(p.iframe||0,0.3);
+    if(stance==='arcane'){
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgArcane+POW(p))*mul);
+      aoe(p,60,dmg,id);
+      dotZones.push({x:p.x,y:p.y,zone:p.zone,radius:60,life:sk.zoneDur,dmg:dmg*0.25,owner:id,tickT:0});
+      p.arcane=Math.min(100,(p.arcane||0)+10);
+      fxEv('ring',p.x,p.y,270,0,0,sk.impactR);
+    } else {
+      const dmg=applyPassiveOnHit(p,id,null,(sk.dmgBlade+POW(p))*mul);
+      aoe(p,sk.impactR,dmg,id);
+      p.momentum=Math.min(100,(p.momentum||0)+10);
+      fxEv('nova',p.x,p.y,15,0,0,sk.impactR);
+    }
+  }
   else if(sk.type==='cone'){
     let fbonus=1;
     if(p.cls==='war'){fbonus=1+((p.fervor||0)*0.005); p.fervor=0;}
@@ -2918,7 +3046,14 @@ function execSkill(p,id,sk,rank,step){
     fxEv('shield',p.x,p.y,195,0,0,sk.radius||70);
   }
   else if(sk.type==='lifesteal'){
-    const h=nearestHostile(p,id,sk.range);
+    let h=null;
+    if(p.wasAimed){
+      const ax=p.x+p.fx*sk.range*p.aimMag, ay=p.y+p.fy*sk.range*p.aimMag;
+      let best=40,bestEnt=null,bestTp=null;
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==p.zone)continue; const d=Math.hypot(e.x-ax,e.y-ay); if(d<best){best=d;bestEnt=e;bestTp='e';}}
+      for(const pid2 in players){ if(pid2==id)continue; const o=players[pid2]; if(!o.chosen||o.dead||o.zone!==p.zone||zoneOf(o).safe)continue; const d=Math.hypot(o.x-ax,o.y-ay); if(d<best){best=d;bestEnt=o;bestTp='p';}}
+      if(bestEnt) h={ent:bestEnt,tp:bestTp};
+    } else h=nearestHostile(p,id,sk.range);
     if(h){ const dmg=applyPassiveOnHit(p,id,null,(sk.dmg+POW(p))*mul);
       const a=Math.atan2(h.ent.y-p.y,h.ent.x-p.x);p.fx=Math.cos(a);p.fy=Math.sin(a);
       if(h.tp==='e')hurtEnemy(h.ent,dmg,id); else hurtPlayer(h.ent,dmg*PVP,id);
@@ -3140,7 +3275,17 @@ function statusStacks(ent,kind){ const s=getStatus(ent,kind); return s?s.stacks:
 function clearStatus(ent,kind){ if(ent.statusEff) delete ent.statusEff[kind]; }
 function tickStatuses(ent,dt){
   if(!ent.statusEff) return;
-  for(const k in ent.statusEff){ const s=ent.statusEff[k]; s.expireT-=dt; if(s.expireT<=0) delete ent.statusEff[k]; }
+  for(const k in ent.statusEff){ const s=ent.statusEff[k];
+    if(s.data && s.data.dmgPerTick){
+      if(s.data.tickT===undefined) s.data.tickT=s.data.tickInt||1;
+      s.data.tickT-=dt;
+      if(s.data.tickT<=0){ s.data.tickT=s.data.tickInt||1;
+        if(ent.chosen) hurtPlayer(ent,s.data.dmgPerTick*PVP,s.data.ownerId,null,true);
+        else hurtEnemy(ent,s.data.dmgPerTick,s.data.ownerId);
+      }
+    }
+    s.expireT-=dt; if(s.expireT<=0) delete ent.statusEff[k];
+  }
 }
 // Ma Kiếm Sĩ: skill tầm xa/khiên ăn thêm Trí Tuệ (hướng "phép"), skill cận chiến vẫn thuần Sức Mạnh (hướng "vật lý") — build lai tùy điểm cộng
 function skDmgPow(p,sk){ let v=POW(p);
@@ -3411,7 +3556,12 @@ function hurtPlayer(o,dmg,atkPid,atkEnemyObj,noReflect){ if(o.dead||o.iframe>0)r
       if(df<=(o.windguardArc||0.9)) dmg*=(o.windguardMul||1); }
   }
   if(o.cls==='war' && (o.fervor||0)>=80) dmg*=0.9; // Blood Frenzy: giảm nhẹ sát thương nhận
-  if(o.shieldHP>0){ const absorb=Math.min(o.shieldHP,dmg); o.shieldHP-=absorb; dmg-=absorb; if(dmg<=0){hitEv(o.x,o.y-16,0,false);return;} }
+  if(o.shieldHP>0){ const absorb=Math.min(o.shieldHP,dmg); o.shieldHP-=absorb; dmg-=absorb;
+    if(o.shieldReflect && absorb>0){ const reflectDmg=absorb*o.shieldReflect;
+      if(atkPid && players[atkPid]) hurtPlayer(players[atkPid],reflectDmg,null,null,true);
+      else if(atkEnemyObj && !atkEnemyObj.dead) hurtEnemy(atkEnemyObj,reflectDmg,undefined); }
+    if(o.shieldHP<=0 && o.shieldManaMode && o.shieldOrigAmount){ o.mp=Math.min(o.maxmp,o.mp+o.shieldOrigAmount*0.5); o.shieldManaMode=false; }
+    if(dmg<=0){hitEv(o.x,o.y-16,0,false);return;} }
   if(o.cls==='war'){ if(o.ironWillT>0){dmg*=0.8;} else if((o.hp/o.maxhp)<0.3 && (o.passT||0)<=0){ o.ironWillT=3; o.passT=15; dmg*=0.8; }
     if(o.maxhp && dmg>o.maxhp*0.08){ o.fervor=Math.min(100,(o.fervor||0)+10); o.momT=0; } // chịu dmg đáng kể → tích Momentum
     if(o.debtT>0 && o.debtTargetObj){ const matches=(atkEnemyObj&&atkEnemyObj===o.debtTargetObj)||(atkPid&&players[atkPid]===o.debtTargetObj);
@@ -3628,17 +3778,27 @@ setInterval(()=>{
       if(Math.hypot(o.x-bn.x,o.y-bn.y)<=bn.radius){ o.bannerAtkBuf=Math.max(o.bannerAtkBuf||0,bn.atkBuf*willBoost); o.bannerDefBuf=Math.max(o.bannerDefBuf||0,bn.defBuf*willBoost); } }
     if(bn.life<=0) banners.splice(i,1);
   }
+  for(let i=dotZones.length-1;i>=0;i--){const dz=dotZones[i]; dz.life-=dt; dz.tickT=(dz.tickT||0)-dt;
+    const doTick=(dz.tickT<=0); if(doTick)dz.tickT=0.5;
+    if(doTick){ let hitCount=0;
+      for(const eid in enemies){const e=enemies[eid]; if(e.dead||e.zone!==dz.zone||hitCount>=4)continue;
+        if(Math.hypot(e.x-dz.x,e.y-dz.y)<=dz.radius){ hurtEnemy(e,dz.dmg,dz.owner); hitCount++; } }
+      for(const pid3 in players){ if(hitCount>=4)continue; const o=players[pid3]; if(!o.chosen||o.dead||o.iframe>0||o.zone!==dz.zone||zoneOf(o).safe||pid3==dz.owner)continue;
+        if(Math.hypot(o.x-dz.x,o.y-dz.y)<=dz.radius){ hurtPlayer(o,dz.dmg*PVP,dz.owner); hitCount++; } }
+    }
+    if(dz.life<=0) dotZones.splice(i,1);
+  }
   const psPublic={}; for(const id in players){const p=players[id];if(!p.chosen)continue;
     try{
-      psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,
+      psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,bladeStance:p.bladeStance||'blade',
         spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0),
-        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),sacrificeBuf:(p.sacrificeAtkBufT>0),soulBuf:(p.soulBufT>0),willActive:(p.commandStateT>0),
+        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),bladefrost:!!getStatus(p,'bladefrost'),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),sacrificeBuf:(p.sacrificeAtkBufT>0),soulBuf:(p.soulBufT>0),willActive:(p.commandStateT>0),
         slowed:(p.slowT>0&&(p.slowMul||1)>=0.15),rooted:(p.slowT>0&&(p.slowMul||1)<0.15)};
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
   const es={}; for(const eid in enemies){const e=enemies[eid];
     es[eid]={x:r1(e.x),y:r1(e.y),zone:e.zone,hp:r1(e.hp),maxhp:e.maxhp,dead:e.dead,boss:e.boss,r:e.r,
-      wound:statusStacks(e,'wound'),shred:!!getStatus(e,'shred'),weak:(e.atkDebuffT>0),marked:!!getStatus(e,'huntmark'),arcmarked:!!getStatus(e,'arcmark'),ravenmarked:!!getStatus(e,'ravenmark'),
+      wound:statusStacks(e,'wound'),shred:!!getStatus(e,'shred'),weak:(e.atkDebuffT>0),marked:!!getStatus(e,'huntmark'),arcmarked:!!getStatus(e,'arcmark'),ravenmarked:!!getStatus(e,'ravenmark'),bladefrost:!!getStatus(e,'bladefrost'),
       slowed:(e.slowT>0&&(e.slowMul||1)>=0.15),rooted:(e.slowT>0&&(e.slowMul||1)<0.15)};}
   const bs=bolts.map(b=>({x:r1(b.x),y:r1(b.y),zone:b.zone,hue:b.hue,kind:b.kind||'bolt',r:b.r||6,a:r2(Math.atan2(b.vy,b.vx))}));
   const ls=loot.map(it=>({id:it.item.id,x:r1(it.x),y:r1(it.y),zone:it.zone,slot:it.item.slot,tier:it.item.tier}));
@@ -3670,4 +3830,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.87 (fix nút đổi vũ khí bị đè khuất) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v0.90 (Blade: stance hóa toàn bộ b3-b8) chạy ở cổng '+PORT));
