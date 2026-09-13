@@ -617,7 +617,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v0.98 · Sóng Kiếm giờ là xoay-lao, hết trùng Băng Kiếm</div>
+  <div id="ver">v1.00 · sửa đúng gốc rễ + 2 tên riêng theo stance</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1250,13 +1250,7 @@ ws.onmessage=function(e){
     lastSkillMeta=mm; myPassive=m.passive||null; myFull=m.full||myFull; myLoadout=m.loadout||myLoadout;
     var isBladeCls=(myFull.length>0 && myFull[0].id && myFull[0].id[0]==='b');
     document.getElementById('sSwap').style.display=isBladeCls?'':'none';
-    for(var kk in map){ var el=document.getElementById(map[kk]); var d=mm[kk]; if(!el||!d)continue;
-      var isEmpty=(kk!=='b' && !d.name);
-      el.classList.toggle('empty', isEmpty);
-      var kEl=el.querySelector('.k'); if(kEl && kk!=='b') kEl.textContent = isEmpty ? '?' : kk.toUpperCase();
-      var lbl=el.querySelector('.l'); if(lbl)lbl.textContent = isEmpty ? '???' : (d.name.length>8?d.name.slice(0,8):d.name).toUpperCase();
-      var mel=el.querySelector('.m'); if(mel){ if(d.mp>0){mel.style.display='';mel.textContent=d.mp;} else mel.style.display='none'; }
-      SKdur[kk]=d.cd; SKmp[kk]=d.mp; }
+    refreshSkillLabels();
     if(chrOpen)renderChr();
   }
   else if(m.t==='inv'){ myInv=m.inv||[]; myEquip=m.equip||{}; myGemCount=m.gemCount||{}; if(invOpen){renderInv();renderDetail();} }
@@ -1285,7 +1279,7 @@ ws.onmessage=function(e){
   else if(m.t==='gold'){ var t='+'+m.val+'🪙'+(m.st?(' +'+m.st+'🔨'):''); dmgs.push({x:m.x,y:m.y,val:t,life:0.9,max:0.9,gold:true}); }
   else if(m.t==='combo'){ comboPrompt.active=m.active; comboPrompt.slot=m.slot; comboPrompt.until=performance.now()+(m.windowMs||600); }
   else if(m.t==='echomark'){ if(m.active){ echoMark.active=true; echoMark.x=m.x; echoMark.y=m.y; echoMark.zone=m.zone; echoMark.maxDist=m.maxDist; echoMark.until=performance.now()+(m.windowMs||5000); } else { echoMark.active=false; } }
-  else if(m.t==='stance'){ myBladeStance=m.stance; var swapLbl=document.getElementById('swapLbl'); if(swapLbl)swapLbl.textContent=(m.stance==='arcane')?'PHÉP':'KIẾM'; }
+  else if(m.t==='stance'){ myBladeStance=m.stance; var swapLbl=document.getElementById('swapLbl'); if(swapLbl)swapLbl.textContent=(m.stance==='arcane')?'PHÉP':'KIẾM'; refreshSkillLabels(); }
   else if(m.t==='skillcd'){ cd[m.slot]=m.dur; comboPrompt.active=false; }
   else if(m.t==='fx'){ var lf=FX_DUR[m.kind]||0.4;
     fx.push({kind:m.kind,x:m.x,y:m.y,fx:m.fx,fy:m.fy,hue:m.hue,R:m.R||60,life:lf,max:lf});
@@ -1349,6 +1343,13 @@ setInterval(function(){ if(ws.readyState===1 && chosen){
 function isComboSkill(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].comboNext; } return false; }
 function cast(k,aim){ if(cd[k]>0)return; var me=players[myId];
   if(me && me.mp<SKmp[k]){ flash(k); return; }
+  if(k==='b' && me && me.cls==='blade' && myBladeStance==='arcane' && !me.dead){
+    var bfx=(myPX!==null?myPX:me.x), bfy=(myPY!==null?myPY:me.y);
+    var bTgtFound=false;
+    for(var beid in enemies){var be=enemies[beid]; if(be.dead||be.zone!==myZone)continue; if(Math.hypot(be.x-bfx,be.y-bfy)<=260){bTgtFound=true;break;}}
+    if(!bTgtFound) for(var bpid in players){ if(bpid==myId)continue; var bo=players[bpid]; if(!bo.chosen||bo.dead||bo.zone!==myZone)continue; if(Math.hypot(bo.x-bfx,bo.y-bfy)<=260){bTgtFound=true;break;} }
+    if(bTgtFound && myPX!==null){ myPX-=myFX*14; myPY-=myFY*14; }
+  }
   if(ws.readyState===1) ws.send(JSON.stringify(aim?{t:'skill',k:k,aim:aim}:{t:'skill',k:k}));
   if(!isComboSkill(k)) cd[k]=SKdur[k]; // skill combo: chờ server báo đúng lúc nào mới thật sự vào hồi chiêu
 }
@@ -1361,6 +1362,18 @@ var chargeState={active:false,slot:null,startT:0};
 var comboPrompt={active:false,slot:null,until:0};
 var echoMark={active:false,x:0,y:0,zone:'',maxDist:500,until:0};
 var myBladeStance='blade';
+function refreshSkillLabels(){
+  if(!lastSkillMeta)return;
+  var map={b:'sB',q:'sQ',w:'sW',e:'sE',r:'sR'};
+  for(var kk in map){ var el=document.getElementById(map[kk]); var d=lastSkillMeta[kk]; if(!el||!d)continue;
+    var isEmpty=(kk!=='b' && !d.name);
+    el.classList.toggle('empty', isEmpty);
+    var kEl=el.querySelector('.k'); if(kEl && kk!=='b') kEl.textContent = isEmpty ? '?' : kk.toUpperCase();
+    var dispName=(myBladeStance==='arcane' && d.nameArcane) ? d.nameArcane : d.name;
+    var lbl=el.querySelector('.l'); if(lbl)lbl.textContent = isEmpty ? '???' : (dispName.length>8?dispName.slice(0,8):dispName).toUpperCase();
+    var mel=el.querySelector('.m'); if(mel){ if(d.mp>0){mel.style.display='';mel.textContent=d.mp;} else mel.style.display='none'; }
+    SKdur[kk]=d.cd; SKmp[kk]=d.mp; }
+}
 var FX_DUR={enchok:0.6,enchfail:0.6,starfall:0.9,bigswing:0.5,raven:0.55,orderflag:0.5,plantflag:0.8,rally:0.7,horsecharge:0.4,ravenscout:0.6,sacrifice:0.5,soulburst:0.6,swapblade:0.4,swaparcane:0.4,phaseslash:0.35,arcblink:0.4,backstep:0.3,spinattack:0.45,jumpslam:0.5,levitatenova:0.9,braceward:0.35,drainbeam:0.4,resonance:0.5};
 var AIM_MAX_PX=90;
 function isChargeable(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].chargeable; } return false; }
@@ -1840,6 +1853,9 @@ function frame(now){
       for(var li=0;li<3;li++){var lx=bl.x-cx*(li*9+4),ly=bl.y-cy2*(li*9+4);
         ctx.strokeStyle='#8a6a2e';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(lx,ly,3,0,7);ctx.stroke();}
       ctx.fillStyle='#3a2a12';ctx.beginPath();ctx.arc(bl.x,bl.y,br,0,7);ctx.fill();ctx.strokeStyle='#c9a24a';ctx.lineWidth=1.5;ctx.stroke();}
+    else if(kind==='blade'){var bang=Math.atan2(bl.vy,bl.vx);ctx.save();ctx.translate(bl.x,bl.y);ctx.rotate(bang);
+      ctx.beginPath();ctx.moveTo(-16,0);ctx.lineTo(6,-6);ctx.lineTo(16,0);ctx.lineTo(6,6);ctx.closePath();ctx.fill();
+      ctx.globalAlpha=0.4;ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(-16,-4);ctx.lineTo(-16,4);ctx.closePath();ctx.fill();ctx.restore();}
     else {ctx.beginPath();ctx.arc(bl.x,bl.y,br,0,7);ctx.fill();}
     ctx.shadowBlur=0;ctx.restore();}
 
@@ -2203,16 +2219,10 @@ wss.on('connection',(ws)=>{
       const inDuality=(p.dualityT||0)>0;
       if(!inDuality && (p.stanceSwapCd||0)>0)return;
       p.bladeStance=(p.bladeStance==='arcane')?'blade':'arcane';
-      p.stanceSwapCd=inDuality?0.12:0.6;
+      p.stanceSwapCd=inDuality?0.1:0.6;
       if(p.bladeStance==='blade'){ p.x+=p.fx*18; p.y+=p.fy*18; } else { p.x-=p.fx*14; p.y-=p.fy*14; }
       clampPos(p);
-      if(inDuality){
-        const bdmg=applyPassiveOnHit(p,id,null,(p.dualityBurstDmg||24)+POW(p)*0.3);
-        aoe(p,70,bdmg,id);
-        fxEv('resonance',p.x,p.y,p.bladeStance==='arcane'?270:15,0,0,70);
-      } else {
-        fxEv(p.bladeStance==='arcane'?'swaparcane':'swapblade',p.x,p.y,p.bladeStance==='arcane'?270:15,0,0,40);
-      }
+      fxEv(p.bladeStance==='arcane'?'swaparcane':'swapblade',p.x,p.y,p.bladeStance==='arcane'?270:15,0,0,inDuality?30:40);
       sendTo(id,{t:'stance',stance:p.bladeStance});
     }
     else if(m.t==='equip'){ doEquip(p,id,m.itemId); }
@@ -2346,26 +2356,26 @@ const SKILLS = {
       desc:'Chọn 1 mục tiêu làm "con mồi" trong 8s — tăng 30% tốc độ đánh của bạn suốt thời gian này + gắn Dấu Ấn Thợ Săn dài hạn lên nó. Ultimate tăng DPS toàn diện.'},
   ],
   blade:[
-    {id:'b1',name:'Chớp Cắt',   icon:'💨',type:'blinkcut', mp:10,cd:2.0, unlockLv:2,  distBlade:110,distArcane:190,dmgBlade:22,
+    {id:'b1',name:'Chớp Cắt', nameArcane:'Hư Không Bộ',  icon:'💨',type:'blinkcut', mp:10,cd:2.0, unlockLv:2,  distBlade:110,distArcane:190,dmgBlade:22,
       desc:'Hành vi đổi theo VŨ KHÍ đang cầm (bấm nút ⇄ để đổi): KIẾM → lao ngắn XUYÊN QUA địch trên đường (vệt chém dày, có động tác thật), gây dame. PHÉP → BIẾN MẤT tức thời rồi HIỆN LẠI ở xa hơn hẳn (không có vệt di chuyển, đúng cảm giác dịch chuyển thật, không phải chạy nhanh), không gây dame nhưng né đòn tốt hơn.'},
-    {id:'b2',name:'Chém Cung',  icon:'⚔️',type:'arcslash', mp:16,cd:1.2, unlockLv:3,  range:115,arc:0.95,dmgBlade:26,rangeArcane:340,dmgArcane:24,
-      desc:'KIẾM → LAO NGƯỜI THẬT về trước như kiếm sĩ lao đâm (vệt chém dài theo cả quãng đường lao) rồi chém cận chiến hình quạt. PHÉP → LÙI NHẸ ra sau trong lúc phóng 1 lưỡi kiếm năng lượng bay xa (kite thật). Đòn Kiếm nuôi Momentum, đòn Phép nuôi Arcane.'},
-    {id:'b3',name:'Sóng Kiếm',  icon:'🌊',type:'swordwave', mp:24,cd:3,   unlockLv:5,  dmgBlade:27,dmgArcane:22,
+    {id:'b2',name:'Chém Cung', nameArcane:'Ma Đạn Xuyên',  icon:'⚔️',type:'arcslash', mp:16,cd:1.2, unlockLv:3,  range:115,arc:0.95,dmgBlade:26,rangeArcane:340,dmgArcane:22,piercArcane:3,
+      desc:'KIẾM → LAO NGƯỜI THẬT về trước như kiếm sĩ lao đâm (vệt chém dài theo cả quãng đường lao) rồi chém cận chiến hình quạt. PHÉP → LÙI NHẸ ra sau trong lúc phóng 1 LƯỠI KIẾM NĂNG LƯỢNG LỚN (hình dạng riêng, không phải đạn tròn) bay xa, XUYÊN QUA tối đa 3 mục tiêu, dame cao hẳn so với đánh thường — đây là đòn kỹ năng thật, không phải bắn thêm 1 phát. Đòn Kiếm nuôi Momentum, đòn Phép nuôi Arcane.'},
+    {id:'b3',name:'Sóng Kiếm', nameArcane:'Huyền Đạn Vũ',  icon:'🌊',type:'swordwave', mp:24,cd:3,   unlockLv:5,  dmgBlade:27,dmgArcane:22,
       desc:'Kiếm: XOAY NGƯỜI lao THẲNG VỀ TRƯỚC (không đứng 1 chỗ), đánh trúng địch dọc cả quãng đường lao lẫn điểm dừng — khác hẳn Băng Kiếm (đứng yên tại chỗ), nuôi Momentum mạnh. Phép: LÙI HẲN 1 bước trong lúc bắn 3 tia xuyên xa (kite thật, không đứng ì), nuôi Arcane.'},
-    {id:'b4',name:'Vũ Bão',     icon:'🌀',type:'stormblade', mp:55,cd:12,  unlockLv:7,  dmgBlade:82,dmgArcane:60,radius:185,
+    {id:'b4',name:'Vũ Bão', nameArcane:'Đại Pháp Trận',    icon:'🌀',type:'stormblade', mp:55,cd:12,  unlockLv:7,  dmgBlade:82,dmgArcane:60,radius:185,
       desc:'ULTIMATE — 2 động tác hoàn toàn khác nhau. Kiếm: NHẢY LÊN KHÔNG TRUNG rồi ĐẬP XUỐNG (bất tử trong lúc bay), nova cực lớn + hút 15% dame thành máu, rung màn hình mạnh. Phép: NHẤC BỔNG NGƯỜI LÊN lơ lửng, nova nhỏ hơn + hồi 25% mana tối đa + làm chậm mọi mục tiêu trúng.'},
-    {id:'b5',name:'Kiếm Hút Sinh',icon:'🩸',type:'bloodsword',mp:18,cd:3.5,unlockLv:10,rangeBlade:105,dmgBlade:28,lsBlade:0.55,rangeArcane:220,dmgArcane:22,lsArcane:0.3, reqStat:'STR',reqVal:12,
+    {id:'b5',name:'Kiếm Hút Sinh', nameArcane:'Linh Hồn Thực',icon:'🩸',type:'bloodsword',mp:18,cd:3.5,unlockLv:10,rangeBlade:105,dmgBlade:28,lsBlade:0.55,rangeArcane:220,dmgArcane:22,lsArcane:0.3, reqStat:'STR',reqVal:12,
       desc:'Nhánh STR (Kiếm mạnh hơn hẳn ở đây). Kiếm: LAO THẲNG TỚI mục tiêu rồi đâm (gap-closer thật), tầm ngắn, hút máu 55%. Phép: ĐỨNG XA tạo 1 SỢI DÂY HÚT MÁU thấy rõ nối tới mục tiêu (không lao tới), tầm xa gấp đôi nhưng hút máu chỉ 30%, bù lại gây thêm Bỏng nhẹ theo thời gian.'},
-    {id:'b6',name:'Hộ Thể Quyết',icon:'🛡️',type:'bodyward', mp:22,cd:9, unlockLv:13, amountBlade:65,reflectPct:0.2,amountArcane:50,manaShieldPct:0.5,dur:5, reqStat:'INT',reqVal:15,
+    {id:'b6',name:'Hộ Thể Quyết', nameArcane:'Ma Lực Hộ Thuẫn',icon:'🛡️',type:'bodyward', mp:22,cd:9, unlockLv:13, amountBlade:65,reflectPct:0.2,amountArcane:50,manaShieldPct:0.5,dur:5, reqStat:'INT',reqVal:15,
       desc:'Nhánh INT (Phép mạnh hơn hẳn ở đây). Kiếm: VÀO THẾ THỦ thật (khiên nhỏ giơ trước người suốt 5s), khiên hấp thụ + phản 20% dame về kẻ đánh. Phép: NGƯỜI LƠ LỬNG NHẸ khỏi mặt đất suốt khi còn khiên, khiên yếu hơn nhưng vỡ ra chuyển 50% phần dư thành Mana ngay.'},
-    {id:'b7',name:'Băng Kiếm',  icon:'❄️',type:'iceblade', mp:24,cd:8,   unlockLv:16, radius:120,dmgBlade:22,dmgArcane:18,slowMul:0.5,slowDur:2.5,
+    {id:'b7',name:'Băng Kiếm', nameArcane:'Băng Phong Ấn',  icon:'❄️',type:'iceblade', mp:24,cd:8,   unlockLv:16, radius:120,dmgBlade:22,dmgArcane:18,slowMul:0.5,slowDur:2.5,
       desc:'Kiếm: DẬM CHÂN THẬT (hơi nhảy lên rồi đập chân xuống) tạo sốc băng quanh mình, làm chậm + gây Wound. Phép: NGƯỜI LƠ LỬNG NGẮN đúc pha lê từ trên xuống, làm chậm + đóng dấu Frostmark riêng của Phép.'},
-    {id:'b8',name:'Kiếm Phá Không',icon:'⚡',type:'voidsword',mp:30,cd:10,unlockLv:20, distBlade:210,dmgBlade:48,impactR:95,distArcane:260,dmgArcane:30,zoneDur:3,
+    {id:'b8',name:'Kiếm Phá Không', nameArcane:'Dị Không Chuyển',icon:'⚡',type:'voidsword',mp:30,cd:10,unlockLv:20, distBlade:210,dmgBlade:48,impactR:95,distArcane:260,dmgArcane:30,zoneDur:3,
       desc:'Kiếm: nhảy bổ xuống, va chạm gây nổ lớn tức thì. Phép: dịch chuyển xa hơn, va chạm nhẹ hơn nhưng để lại 1 VÙNG DAME liên tục 3s tại điểm đáp.'},
     {id:'b9',name:'Cộng Hưởng Song Kiếm',icon:'✨',type:'dualresonance',mp:20,cd:14,unlockLv:24,dur:4,
       desc:'KHÔNG gây dame — mở 4s "Cộng Hưởng": MỌI đòn đánh (kể cả đánh thường) tự động gây thêm 25% dame LOẠI KIA (đang cầm Kiếm thì thêm dame Phép, đang cầm Phép thì thêm dame Kiếm) + nuôi CẢ 2 thanh Momentum/Arcane cùng lúc gấp đôi tốc độ bình thường. Đây là công cụ DUY NHẤT trong bộ kỹ năng không thuộc phe nào — dùng để dồn tài nguyên trước khi tung Song Trùng Đoạn Tuyệt.'},
-    {id:'b10',name:'Song Trùng Đoạn Tuyệt',icon:'☯️',type:'dualitycollapse',mp:50,cd:40,unlockLv:28,dur:3,burstDmg:24,
-      desc:'ULTIMATE THỨ 2 — hoàn toàn khác Vũ Bão (không phải nổ to 1 phát). Mở 3s "Vô Cực": nút đổi vũ khí KHÔNG CÒN HỒI CHIÊU — đổi liên tục thoải mái, MỖI LẦN đổi tự nổ 1 đợt sát thương nhỏ quanh mình (đổi sang Kiếm nổ dame Kiếm, đổi sang Phép nổ dame Phép). Sức mạnh thật sự nằm ở KỸ NĂNG bấm đổi liên tục đúng nhịp, không phải 1 nút bấm ăn ngay.'},
+    {id:'b10',name:'Song Trùng Đoạn Tuyệt',icon:'☯️',type:'dualitycollapse',mp:50,cd:40,unlockLv:28,dur:3,
+      desc:'ULTIMATE THỨ 2 — MỤC ĐÍCH RÕ RÀNG: mở 3s "Vô Cực" — đổi vũ khí gần như không hồi chiêu (0.1s) + MỌI đòn skill trong 3s này +30% sát thương. Combo thật: dùng b1(Kiếm)→đổi ngay→b1(Phép)→đổi→b8(Kiếm)→đổi→b8(Phép)... liên tiếp không nghỉ, tận dụng CẢ 2 phiên bản của mọi skill trong 1 chuỗi burst duy nhất mà bình thường phải đợi hồi chiêu đổi mới làm được. Không phải "đứng bấm nút" — phải thật sự RA SKILL liên tục mới ăn hết giá trị.'},
   ],
   // Thống Lĩnh — "Chỉ Huy" lai giữa Dark Lord (xích, áp chế) và support (1 skill hồi máu duy nhất, không phải class heal chính)
   cmd: [
@@ -2407,12 +2417,12 @@ function findSkill(cls,id){ return (SKILLS[cls]||[]).find(s=>s.id===id); }
 function skillMeta(p){
   const map={ b:{icon:(p.basicType==='melee'?'⚔️':'✦'),name:'Đánh thường',mp:0,cd:p.basicCd,rank:1} };
   for(const k of ['q','w','e','r']){ const sid=p.loadout&&p.loadout[k]; const s=findSkill(p.cls,sid);
-    map[k]= s ? {icon:s.icon,name:s.name,mp:s.mp,cd:s.cd,rank:(p.skRank&&p.skRank[sid])||1} : {icon:'?',name:'',mp:0,cd:1,rank:0}; }
+    map[k]= s ? {icon:s.icon,name:s.name,nameArcane:s.nameArcane||null,mp:s.mp,cd:s.cd,rank:(p.skRank&&p.skRank[sid])||1} : {icon:'?',name:'',mp:0,cd:1,rank:0}; }
   return map;
 }
 function meetsReq(p,s){ return p.lv>=s.unlockLv && (!s.reqStat || (p[s.reqStat]||0)>=s.reqVal); }
 function fullSkillList(p){
-  return (SKILLS[p.cls]||[]).map(s=>({id:s.id,name:s.name,icon:s.icon,mp:s.mp,cd:s.cd,unlockLv:s.unlockLv,
+  return (SKILLS[p.cls]||[]).map(s=>({id:s.id,name:s.name,nameArcane:s.nameArcane||null,icon:s.icon,mp:s.mp,cd:s.cd,unlockLv:s.unlockLv,
     reqStat:s.reqStat||null,reqVal:s.reqVal||0,desc:s.desc||'',scaleKey:s.scaleKey||null,type:s.type,
     range:s.throwRange||s.range||s.dist||s.rangeOut||s.dashDist||0,radius:s.radius||s.triggerR||0,len:s.len||0,width:s.width||0,arc:s.arc||0,chargeable:!!s.chargeable,comboNext:!!s.comboNext,channelable:!!s.channelable,
     unlocked:meetsReq(p,s), rank:(p.skRank&&p.skRank[s.id])||1}));
@@ -2491,6 +2501,7 @@ function applyPassiveOnHit(p,id,target,dmg){
     const lsPct=(stance==='blade')?0.10:0;
     if(lsPct>0) p.hp=Math.min(p.maxhp,p.hp+dmg*mul*lsPct);
     if(p.resonanceT>0) mul*=1.25;
+    if(p.dualityT>0) mul*=1.3;
   }
   if(p.bannerAtkBuf) mul*=(1+p.bannerAtkBuf);
   if(p.decreeAtkBuf) mul*=(1+p.decreeAtkBuf);
@@ -2520,7 +2531,7 @@ function doBasic(p,id){
     let shotDmg=dmg; if(p.cls==='arc' && p.rhythmReady){ shotDmg*=1.25; p.rhythmReady=false; }
     const bSpd=bladeArcaneMode?540:p.basicSpd, bKind=bladeArcaneMode?'bolt':p.basicKind, bR=bladeArcaneMode?6:p.basicR, bHue=bladeArcaneMode?270:p.hue;
     bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*bSpd,vy:Math.sin(a)*bSpd,life:1.0,dmg:applyPassiveOnHit(p,id,null,shotDmg),owner:id,hue:bHue,kind:bKind,r:bR});
-    if(bladeArcaneMode && hit){ p.x-=Math.cos(a)*14; p.y-=Math.sin(a)*14; clampPos(p); } // Phép: lùi nhẹ mỗi phát — cảm giác kite thật, khác hẳn đứng yên
+    if(bladeArcaneMode && hit){ p.x-=Math.cos(a)*14; p.y-=Math.sin(a)*14; clampPos(p); } // Phép: lùi nhẹ mỗi phát — client giờ TỰ DỰ ĐOÁN đúng cú lùi này (xem hàm cast()), không còn xung đột nữa
     if(p.cls==='arc' && hit){ p.focus=Math.min(100,(p.focus||0)+10); p.rhythmFx=p.fx; p.rhythmFy=p.fy; p.rhythmT=0.6; }
     if(p.cls==='blade') p.arcane=Math.min(100,(p.arcane||0)+6);
   }
@@ -2981,7 +2992,7 @@ function execSkill(p,id,sk,rank,step){
     if(stance==='arcane'){
       const a=Math.atan2(p.fy,p.fx);
       const dmg=applyPassiveOnHit(p,id,null,(sk.dmgArcane+POW(p))*mul);
-      bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*560,vy:Math.sin(a)*560,life:sk.rangeArcane/560,dmg,curDmg:dmg,owner:id,hue:270,kind:'bolt',r:7});
+      bolts.push({x:p.x,y:p.y,zone:p.zone,vx:Math.cos(a)*640,vy:Math.sin(a)*640,life:sk.rangeArcane/640,dmg,curDmg:dmg,pierce:sk.piercArcane,falloff:0.85,owner:id,hue:270,kind:'blade',r:14});
       p.x-=p.fx*22; p.y-=p.fy*22; clampPos(p);
       p.arcane=Math.min(100,(p.arcane||0)+8);
       p.spellBladeT=3;
@@ -3137,7 +3148,6 @@ function execSkill(p,id,sk,rank,step){
   }
   else if(sk.type==='dualitycollapse'){
     p.dualityT=sk.dur;
-    p.dualityBurstDmg=sk.burstDmg;
     fxEv('resonance',p.x,p.y,190,0,0,60);
   }
   else if(sk.type==='cone'){
@@ -3991,4 +4001,4 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v0.98 (Sóng Kiếm xoay-lao, hết trùng Băng Kiếm) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.00 (sửa gốc rễ + 2 tên riêng theo stance) chạy ở cổng '+PORT));
