@@ -2,12 +2,15 @@
 // WEBGAME — MMORPG server-authoritative (Node + ws, single-file theo quy trình tablet-upload)
 // 5 class · 8-12 skill/class (combo riêng) · world nhiều vùng · dungeon vé vào
 // world boss lịch cố định · NPC/quest · party/guild/chat · loot/enchant/equip
-// Chạy:  npm install ws   →   node server.js
+// LƯU TRỮ THẬT: Postgres (Supabase) qua biến môi trường DATABASE_URL — xem hàm dbInit/dbLoad/dbSave
+// Chạy:  npm install ws pg   →   node server.js
 // ============================================================
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const { Pool } = require('pg');
 
 const PORT = process.env.PORT || 3000;
+const dbPool = process.env.DATABASE_URL ? new Pool({connectionString:process.env.DATABASE_URL, ssl:{rejectUnauthorized:false}}) : null;
 const W = 800, H = 600, SPD = 250;
 // ---- VÙNG BẢN ĐỒ (world nhiều vùng + thị trấn an toàn) ----
 const ZONES = {
@@ -593,7 +596,14 @@ const CLIENT = `<!doctype html>
     <div id="detail"></div>
     <button id="invClose">Đóng</button>
   </div>
-  <div id="pick">
+  <div id="nameEntry" style="position:absolute;inset:0;z-index:21;background:rgba(10,8,5,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px">
+    <h2>Nhập Tên Nhân Vật</h2>
+    <p style="color:#9a8a6a;margin-bottom:14px">Dùng đúng tên này mỗi lần vào lại để giữ nguyên nhân vật của bạn</p>
+    <input id="nameInput" maxlength="20" placeholder="Tên nhân vật..." style="font-size:18px;padding:10px 14px;border-radius:8px;border:2px solid #a87b3e;background:#171009;color:#e0b062;text-align:center;width:240px">
+    <button id="nameSubmit" style="margin-top:14px;font-size:16px;padding:10px 24px;border-radius:8px;border:2px solid #a87b3e;background:#2c2114;color:#e0b062">Vào Game</button>
+    <p id="nameMsg" style="color:#ff8a5a;margin-top:10px;min-height:20px"></p>
+  </div>
+  <div id="pick" style="display:none">
     <h2>Chọn Class</h2><p>Mỗi class một lối chơi — chọn để vào trận</p>
     <div class="pc" id="pcards"></div>
   </div>
@@ -617,7 +627,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.00 · sửa đúng gốc rễ + 2 tên riêng theo stance</div>
+  <div id="ver">v1.10 · LƯU TRỮ THẬT (database) + nhập tên nhân vật</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1159,6 +1169,16 @@ var CLS={
   blade:{n:'⚡ Ma Kiếm Sĩ',d:'Lai kiếm-phép · cân bằng'},
   cmd:{n:'👑 Thống Lĩnh',d:'Trượng tầm xa · trâu · chỉ huy'}
 };
+function submitName(){
+  var v=(document.getElementById('nameInput').value||'').trim();
+  if(!v){ document.getElementById('nameMsg').textContent='Nhập tên đã.'; return; }
+  document.getElementById('nameSubmit').disabled=true;
+  document.getElementById('nameMsg').textContent='';
+  if(ws.readyState===1) ws.send(JSON.stringify({t:'login',name:v}));
+  else setTimeout(function(){ if(ws.readyState===1) ws.send(JSON.stringify({t:'login',name:v})); },500);
+}
+document.getElementById('nameSubmit').addEventListener('pointerdown',function(ev){ev.preventDefault();submitName();});
+document.getElementById('nameInput').addEventListener('keydown',function(ev){if(ev.key==='Enter')submitName();});
 (function buildPicker(){var box=document.getElementById('pcards');
   var order=['war','mage','arc','blade','cmd'];
   for(var i=0;i<order.length;i++){(function(c){
@@ -1183,6 +1203,13 @@ ws.onmessage=function(e){
  try{
   var m=JSON.parse(e.data);
   if(m.t==='welcome'){myId=m.id;document.getElementById('me').textContent='#'+m.id;}
+  else if(m.t==='loginresult'){
+    var nsBtn=document.getElementById('nameSubmit'); if(nsBtn)nsBtn.disabled=false;
+    if(!m.ok){ document.getElementById('nameMsg').textContent='Tên không hợp lệ, thử lại.'; return; }
+    document.getElementById('nameEntry').style.display='none';
+    if(m.returning){ chosen=true; }
+    else { document.getElementById('pick').style.display='flex'; }
+  }
   else if(m.t==='zones'){ ZONEDATA=m.zones||{}; }
   else if(m.t==='npcs'){ NPCLIST=m.npcs||[]; }
   else if(m.t==='pettypes'){ PETTYPES=m.types||[]; }
@@ -1343,13 +1370,6 @@ setInterval(function(){ if(ws.readyState===1 && chosen){
 function isComboSkill(k){ var sid=myLoadout&&myLoadout[k]; for(var i=0;i<myFull.length;i++){ if(myFull[i].id===sid) return !!myFull[i].comboNext; } return false; }
 function cast(k,aim){ if(cd[k]>0)return; var me=players[myId];
   if(me && me.mp<SKmp[k]){ flash(k); return; }
-  if(k==='b' && me && me.cls==='blade' && myBladeStance==='arcane' && !me.dead){
-    var bfx=(myPX!==null?myPX:me.x), bfy=(myPY!==null?myPY:me.y);
-    var bTgtFound=false;
-    for(var beid in enemies){var be=enemies[beid]; if(be.dead||be.zone!==myZone)continue; if(Math.hypot(be.x-bfx,be.y-bfy)<=260){bTgtFound=true;break;}}
-    if(!bTgtFound) for(var bpid in players){ if(bpid==myId)continue; var bo=players[bpid]; if(!bo.chosen||bo.dead||bo.zone!==myZone)continue; if(Math.hypot(bo.x-bfx,bo.y-bfy)<=260){bTgtFound=true;break;} }
-    if(bTgtFound && myPX!==null){ myPX-=myFX*14; myPY-=myFY*14; }
-  }
   if(ws.readyState===1) ws.send(JSON.stringify(aim?{t:'skill',k:k,aim:aim}:{t:'skill',k:k}));
   if(!isComboSkill(k)) cd[k]=SKdur[k]; // skill combo: chờ server báo đúng lúc nào mới thật sự vào hồi chiêu
 }
@@ -1868,7 +1888,7 @@ function frame(now){
     myPX+=pmx*spd*dt; myPY+=pmy*spd*dt;
     myPX=Math.max(15,Math.min(zd.w-15,myPX)); myPY=Math.max(15,Math.min(zd.h-15,myPY));
     var gap=Math.hypot(me.x-myPX,me.y-myPY);
-    if(gap>110){myPX+=(me.x-myPX)*0.5;myPY+=(me.y-myPY)*0.5;} else {myPX+=(me.x-myPX)*0.12;myPY+=(me.y-myPY)*0.12;}
+    if(gap>110){myPX+=(me.x-myPX)*0.5;myPY+=(me.y-myPY)*0.5;} else {myPX+=(me.x-myPX)*0.35;myPY+=(me.y-myPY)*0.35;}
     if(joy.mag>0.2){myFX=joy.dx;myFY=joy.dy;} else {myFX=me.fx;myFY=me.fy;}
   } else { myPX=null; }
 
@@ -1906,7 +1926,7 @@ function frame(now){
     ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
     ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
     ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
-    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.bladefrost)pStIc+='🧊'; if(p.spellBladeArmed)pStIc+='✨'; if(p.resonanceActive)pStIc+='🌗'; if(p.dualityActive)pStIc+='☯️'; if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.sacrificeBuf)pStIc+='💔'; if(p.soulBuf)pStIc+='📖'; if(p.willActive)pStIc+='👑'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
+    var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.bladefrost)pStIc+='🧊'; if(p.spellBladeArmed)pStIc+='✨'; if(p.resonanceActive)pStIc+='🌗'; if(p.dualityActive)pStIc+='☯️'+(p.dualityStacks||0); if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.sacrificeBuf)pStIc+='💔'; if(p.soulBuf)pStIc+='📖'; if(p.willActive)pStIc+='👑'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
     if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-44); }
     ctx.globalAlpha=1;
   }
@@ -2079,6 +2099,35 @@ const server = http.createServer((req,res)=>{
 const wss = new WebSocketServer({ server });
 wss.on('error', (err) => { console.error('⚠️ Lỗi WebSocketServer (đã chặn):', err && err.message); });
 
+// ==================== LƯU TRỮ THẬT (Postgres/Supabase qua DATABASE_URL) ====================
+// Chỉ lưu các field TIẾN TRÌNH thật (level/đồ/skill/tiền...), KHÔNG lưu state chiến đấu tạm thời
+// (hp hiện tại, cooldown, buff timer...) — những cái đó luôn reset sạch mỗi lần vào lại là đúng.
+const SAVE_FIELDS = ['cls','lv','xp','xpNext','gold','stones','STR','VIT','AGI','INT','statPts','skillPts',
+  'skRank','loadout','inv','equip','zone','x','y','qk','qc','dailyDate','checkinStreak','checkedToday',
+  'npcAccepted','npcClaimed','cum','dungeonEntries','dungeonDate','mounts','mounted','pet','guild','pkScore',
+  'gemCount','baseMaxhp'];
+async function dbInit(){
+  if(!dbPool)return console.log('⚠️ Chưa có DATABASE_URL — chạy KHÔNG LƯU TRỮ (dữ liệu mất khi restart, chỉ dùng để test tạm).');
+  try{
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS characters (
+      name TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW())`);
+    console.log('✅ Database sẵn sàng (bảng characters).');
+  }catch(err){ console.error('⚠️ Lỗi kết nối database lúc khởi động:', err && err.message); }
+}
+async function dbLoadChar(name){
+  if(!dbPool)return null;
+  try{ const r=await dbPool.query('SELECT data FROM characters WHERE name=$1',[name]); return r.rows[0]?r.rows[0].data:null; }
+  catch(err){ console.error('⚠️ Lỗi load nhân vật "'+name+'":', err && err.message); return null; }
+}
+async function dbSaveChar(name,p){
+  if(!dbPool||!name||!p.chosen)return;
+  try{
+    const data={}; for(const f of SAVE_FIELDS) data[f]=p[f];
+    await dbPool.query(`INSERT INTO characters(name,data,updated_at) VALUES($1,$2,NOW())
+      ON CONFLICT(name) DO UPDATE SET data=$2, updated_at=NOW()`,[name,JSON.stringify(data)]);
+  }catch(err){ console.error('⚠️ Lỗi lưu nhân vật "'+name+'":', err && err.message); }
+}
+
 const players = {};
 const enemies = {};
 let bolts = [];
@@ -2149,7 +2198,7 @@ wss.on('connection',(ws)=>{
     dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,hspet:null,hspetApplied:null,
     gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,summon:null,
     basicType:'melee',basicRange:90,basicDmg:18,basicCd:0.45,basicSpd:0,basicR:6,basicKind:'melee',
-    cd:{b:0,q:0,w:0,e:0,r:0}};
+    cd:{b:0,q:0,w:0,e:0,r:0},charName:null};
   ws.pid=id; sockets[id]=ws;
   ws.send(JSON.stringify({t:'welcome',id}));
   ws.send(JSON.stringify({t:'zones',zones:ZONES}));
@@ -2161,6 +2210,29 @@ wss.on('connection',(ws)=>{
   ws.on('message',(buf)=>{
     let m; try{m=JSON.parse(buf.toString());}catch(e){return;}
     const p=players[id]; if(!p)return;
+    if(m.t==='login'){
+      const name=(''+(m.name||'')).trim().slice(0,20);
+      if(!name){ sendTo(id,{t:'loginresult',ok:false}); return; }
+      p.charName=name;
+      dbLoadChar(name).then(saved=>{
+        if(saved && saved.cls && CLASSES[saved.cls]){
+          const c=CLASSES[saved.cls];
+          Object.assign(p,saved);
+          p.chosen=true; p.hue=c.hue; p.spd=c.spd;
+          p.basicType=c.basic.type; p.basicRange=c.basic.range; p.basicDmg=c.basic.dmg; p.basicCd=c.basic.cd;
+          p.basicSpd=c.basic.spd||0; p.basicR=c.basic.r||6; p.basicKind=c.basic.kind||'melee';
+          p.iframe=2; recompute(p); p.hp=p.maxhp; p.mp=p.maxmp;
+          sendInv(p,id); sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout}); sendQuests(p,id); sendGuildData(id);
+          sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
+          ensureDungeon(p); sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
+          sendTo(id,{t:'loginresult',ok:true,returning:true});
+          console.log('👤 "'+name+'" đăng nhập lại — khôi phục nhân vật '+saved.cls+' Lv'+(saved.lv||1));
+        } else {
+          sendTo(id,{t:'loginresult',ok:true,returning:false});
+        }
+      });
+      return;
+    }
     if(m.t==='pick'){
       const c=CLASSES[m.c]; if(!c||p.chosen)return;
       try{
@@ -2173,7 +2245,7 @@ wss.on('connection',(ws)=>{
         p.buffT=0; p.STR=0;p.VIT=0;p.AGI=0;p.INT=0;p.statPts=0;p.skillPts=0;p.skRank={};
         p.loadout={q:null,w:null,e:null,r:null}; // bắt đầu trống — chỉ đánh thường, skill mở khóa dần theo cấp
         p.shieldHP=0;p.shieldT=0;p.slowT=0;p.slowMul=1;
-        p.passT=0;p.comboN=0;p.comboTgt=null;p.spellBladeT=0;p.resonanceT=0;p.dualityT=0; recompute(p);
+        p.passT=0;p.comboN=0;p.comboTgt=null;p.spellBladeT=0;p.resonanceT=0;p.dualityT=0;p.dualityStacks=0; recompute(p);
         sendInv(p,id); sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout}); sendQuests(p,id); sendGuildData(id);
         sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
         ensureDungeon(p); sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
@@ -2222,6 +2294,7 @@ wss.on('connection',(ws)=>{
       p.stanceSwapCd=inDuality?0.1:0.6;
       if(p.bladeStance==='blade'){ p.x+=p.fx*18; p.y+=p.fy*18; } else { p.x-=p.fx*14; p.y-=p.fy*14; }
       clampPos(p);
+      if(inDuality) p.dualityStacks=Math.min(5,(p.dualityStacks||0)+1);
       fxEv(p.bladeStance==='arcane'?'swaparcane':'swapblade',p.x,p.y,p.bladeStance==='arcane'?270:15,0,0,inDuality?30:40);
       sendTo(id,{t:'stance',stance:p.bladeStance});
     }
@@ -2274,6 +2347,7 @@ wss.on('connection',(ws)=>{
   ws.on('close',()=>{ const p=players[id]; if(p&&p.party&&parties[p.party]){ const pt=parties[p.party];
       pt.members=pt.members.filter(m=>m!==id);
       if(pt.members.length===0)delete parties[p.party]; else { if(pt.leader===id)pt.leader=pt.members[0]; sendPartyUpdate(p.party); } }
+    if(p&&p.charName&&p.chosen) dbSaveChar(p.charName,p);
     delete players[id]; delete sockets[id]; });
 });
 
@@ -2374,8 +2448,8 @@ const SKILLS = {
       desc:'Kiếm: nhảy bổ xuống, va chạm gây nổ lớn tức thì. Phép: dịch chuyển xa hơn, va chạm nhẹ hơn nhưng để lại 1 VÙNG DAME liên tục 3s tại điểm đáp.'},
     {id:'b9',name:'Cộng Hưởng Song Kiếm',icon:'✨',type:'dualresonance',mp:20,cd:14,unlockLv:24,dur:4,
       desc:'KHÔNG gây dame — mở 4s "Cộng Hưởng": MỌI đòn đánh (kể cả đánh thường) tự động gây thêm 25% dame LOẠI KIA (đang cầm Kiếm thì thêm dame Phép, đang cầm Phép thì thêm dame Kiếm) + nuôi CẢ 2 thanh Momentum/Arcane cùng lúc gấp đôi tốc độ bình thường. Đây là công cụ DUY NHẤT trong bộ kỹ năng không thuộc phe nào — dùng để dồn tài nguyên trước khi tung Song Trùng Đoạn Tuyệt.'},
-    {id:'b10',name:'Song Trùng Đoạn Tuyệt',icon:'☯️',type:'dualitycollapse',mp:50,cd:40,unlockLv:28,dur:3,
-      desc:'ULTIMATE THỨ 2 — MỤC ĐÍCH RÕ RÀNG: mở 3s "Vô Cực" — đổi vũ khí gần như không hồi chiêu (0.1s) + MỌI đòn skill trong 3s này +30% sát thương. Combo thật: dùng b1(Kiếm)→đổi ngay→b1(Phép)→đổi→b8(Kiếm)→đổi→b8(Phép)... liên tiếp không nghỉ, tận dụng CẢ 2 phiên bản của mọi skill trong 1 chuỗi burst duy nhất mà bình thường phải đợi hồi chiêu đổi mới làm được. Không phải "đứng bấm nút" — phải thật sự RA SKILL liên tục mới ăn hết giá trị.'},
+    {id:'b10',name:'Song Trùng Đoạn Tuyệt',icon:'☯️',type:'dualitycollapse',mp:50,cd:40,unlockLv:28,dur:4,
+      desc:'ULTIMATE THỨ 2 — mở 4s "Vô Cực": đổi vũ khí gần như không hồi chiêu (0.1s) + MỖI LẦN đổi cộng dồn thêm 1 tầng sức mạnh (tối đa 5 tầng, mỗi tầng +8% dame mọi skill = tối đa +40%). Càng đổi nhiều, dồn càng cao — thấy rõ số tầng trên HUD. Hết 4s tầng mất sạch. Giá trị thật: chuỗi combo cả 2 phiên bản mọi skill liên tiếp (b1 Kiếm→đổi→b1 Phép→đổi→b8 Kiếm...) mà bình thường phải đợi hồi chiêu đổi mới làm được, VỪA dồn tầng sức mạnh trong lúc combo.'},
   ],
   // Thống Lĩnh — "Chỉ Huy" lai giữa Dark Lord (xích, áp chế) và support (1 skill hồi máu duy nhất, không phải class heal chính)
   cmd: [
@@ -2501,7 +2575,7 @@ function applyPassiveOnHit(p,id,target,dmg){
     const lsPct=(stance==='blade')?0.10:0;
     if(lsPct>0) p.hp=Math.min(p.maxhp,p.hp+dmg*mul*lsPct);
     if(p.resonanceT>0) mul*=1.25;
-    if(p.dualityT>0) mul*=1.3;
+    if(p.dualityT>0) mul*=(1+(p.dualityStacks||0)*0.08);
   }
   if(p.bannerAtkBuf) mul*=(1+p.bannerAtkBuf);
   if(p.decreeAtkBuf) mul*=(1+p.decreeAtkBuf);
@@ -3148,6 +3222,7 @@ function execSkill(p,id,sk,rank,step){
   }
   else if(sk.type==='dualitycollapse'){
     p.dualityT=sk.dur;
+    p.dualityStacks=0;
     fxEv('resonance',p.x,p.y,190,0,0,60);
   }
   else if(sk.type==='cone'){
@@ -3795,7 +3870,7 @@ setInterval(()=>{
     if(p.stanceSwapCd>0)p.stanceSwapCd-=dt;
     if(p.resonanceT>0){ p.resonanceT-=dt; p.resonanceTick=(p.resonanceTick||0)-dt;
       if(p.resonanceTick<=0){ p.resonanceTick=0.4; p.momentum=Math.min(100,(p.momentum||0)+3); p.arcane=Math.min(100,(p.arcane||0)+3); } }
-    if(p.dualityT>0)p.dualityT-=dt;
+    if(p.dualityT>0){ p.dualityT-=dt; if(p.dualityT<=0) p.dualityStacks=0; }
     if(p.jumpT>0)p.jumpT-=dt;
     if(p.levitateT>0)p.levitateT-=dt;
     if(p.braceT>0)p.braceT-=dt;
@@ -3963,7 +4038,7 @@ setInterval(()=>{
     try{
       psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,bladeStance:p.bladeStance||'blade',jumpT:r2(p.jumpT||0),jumpScale:r2(p.jumpScale||1),levitateT:r2(p.levitateT||0),braceT:r2(p.braceT||0),
         spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)*((p.cls==='blade'&&getStance(p)==='arcane')?1.15:1)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0),
-        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),bladefrost:!!getStatus(p,'bladefrost'),spellBladeArmed:(p.spellBladeT>0),resonanceActive:(p.resonanceT>0),dualityActive:(p.dualityT>0),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),sacrificeBuf:(p.sacrificeAtkBufT>0),soulBuf:(p.soulBufT>0),willActive:(p.commandStateT>0),
+        wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),bladefrost:!!getStatus(p,'bladefrost'),spellBladeArmed:(p.spellBladeT>0),resonanceActive:(p.resonanceT>0),dualityActive:(p.dualityT>0),dualityStacks:(p.dualityStacks||0),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),sacrificeBuf:(p.sacrificeAtkBufT>0),soulBuf:(p.soulBufT>0),willActive:(p.commandStateT>0),
         slowed:(p.slowT>0&&(p.slowMul||1)>=0.15),rooted:(p.slowT>0&&(p.slowMul||1)<0.15)};
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
@@ -4001,4 +4076,7 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.00 (sửa gốc rễ + 2 tên riêng theo stance) chạy ở cổng '+PORT));
+setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charName&&p.chosen) dbSaveChar(p.charName,p); } }, 60000);
+
+dbInit();
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.10 (LƯU TRỮ THẬT + nhập tên nhân vật) chạy ở cổng '+PORT));
