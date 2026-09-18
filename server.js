@@ -596,18 +596,24 @@ const CLIENT = `<!doctype html>
     <div id="detail"></div>
     <button id="invClose">Đóng</button>
   </div>
-  <div id="nameEntry" style="position:absolute;inset:0;z-index:21;background:rgba(10,8,5,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px">
-    <h2>Nhập Tên Nhân Vật</h2>
-    <p style="color:#9a8a6a;margin-bottom:14px">Dùng đúng tên này mỗi lần vào lại để giữ nguyên nhân vật của bạn</p>
-    <input id="nameInput" maxlength="20" placeholder="Tên nhân vật..." style="font-size:18px;padding:10px 14px;border-radius:8px;border:2px solid #a87b3e;background:#171009;color:#e0b062;text-align:center;width:240px">
-    <button id="nameSubmit" style="margin-top:14px;font-size:16px;padding:10px 24px;border-radius:8px;border:2px solid #a87b3e;background:#2c2114;color:#e0b062">Vào Game</button>
-    <p id="nameMsg" style="color:#ff8a5a;margin-top:10px;min-height:20px"></p>
+  <div id="loginScr" style="position:absolute;inset:0;z-index:21;background:rgba(10,8,5,0.94);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px">
+    <h2>Đăng Nhập</h2>
+    <p style="color:#9a8a6a;margin-bottom:14px;text-align:center">Tài khoản mới sẽ tự tạo nếu chưa tồn tại</p>
+    <input id="userInput" maxlength="20" placeholder="Tên đăng nhập..." style="font-size:16px;padding:10px 14px;border-radius:8px;border:2px solid #a87b3e;background:#171009;color:#e0b062;text-align:center;width:240px;margin-bottom:10px">
+    <input id="passInput" type="password" maxlength="40" placeholder="Mật khẩu..." style="font-size:16px;padding:10px 14px;border-radius:8px;border:2px solid #a87b3e;background:#171009;color:#e0b062;text-align:center;width:240px">
+    <button id="loginSubmit" style="margin-top:14px;font-size:16px;padding:10px 24px;border-radius:8px;border:2px solid #a87b3e;background:#2c2114;color:#e0b062">Đăng Nhập</button>
+    <p id="loginMsg" style="color:#ff8a5a;margin-top:10px;min-height:20px"></p>
+  </div>
+  <div id="slotScr" style="position:absolute;inset:0;z-index:21;background:rgba(10,8,5,0.94);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px">
+    <h2>Chọn Nhân Vật</h2>
+    <div id="slotCards" style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;justify-content:center"></div>
   </div>
   <div id="pick" style="display:none">
     <h2>Chọn Class</h2><p>Mỗi class một lối chơi — chọn để vào trận</p>
     <div class="pc" id="pcards"></div>
   </div>
   <canvas id="c"></canvas>
+
   <div id="hud">
     <div class="nm" id="me">#?</div>
     <div class="bar"><i id="hpb" style="width:100%"></i><span id="hpt">100/100</span></div>
@@ -627,7 +633,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.10 · LƯU TRỮ THẬT (database) + nhập tên nhân vật</div>
+  <div id="ver">v1.20 · tài khoản thật (ID+MK) + 3 ô nhân vật</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1169,16 +1175,31 @@ var CLS={
   blade:{n:'⚡ Ma Kiếm Sĩ',d:'Lai kiếm-phép · cân bằng'},
   cmd:{n:'👑 Thống Lĩnh',d:'Trượng tầm xa · trâu · chỉ huy'}
 };
-function submitName(){
-  var v=(document.getElementById('nameInput').value||'').trim();
-  if(!v){ document.getElementById('nameMsg').textContent='Nhập tên đã.'; return; }
-  document.getElementById('nameSubmit').disabled=true;
-  document.getElementById('nameMsg').textContent='';
-  if(ws.readyState===1) ws.send(JSON.stringify({t:'login',name:v}));
-  else setTimeout(function(){ if(ws.readyState===1) ws.send(JSON.stringify({t:'login',name:v})); },500);
+function submitLogin(){
+  var u=(document.getElementById('userInput').value||'').trim();
+  var pw=document.getElementById('passInput').value||'';
+  if(!u||pw.length<3){ document.getElementById('loginMsg').textContent='Tên đăng nhập + mật khẩu (tối thiểu 3 ký tự).'; return; }
+  document.getElementById('loginSubmit').disabled=true;
+  document.getElementById('loginMsg').textContent='';
+  if(ws.readyState===1) ws.send(JSON.stringify({t:'authlogin',user:u,pass:pw}));
+  else setTimeout(function(){ if(ws.readyState===1) ws.send(JSON.stringify({t:'authlogin',user:u,pass:pw})); },500);
 }
-document.getElementById('nameSubmit').addEventListener('pointerdown',function(ev){ev.preventDefault();submitName();});
-document.getElementById('nameInput').addEventListener('keydown',function(ev){if(ev.key==='Enter')submitName();});
+document.getElementById('loginSubmit').addEventListener('pointerdown',function(ev){ev.preventDefault();submitLogin();});
+document.getElementById('passInput').addEventListener('keydown',function(ev){if(ev.key==='Enter')submitLogin();});
+function renderSlots(slots){
+  var box=document.getElementById('slotCards'); box.innerHTML='';
+  for(var i=0;i<3;i++){(function(idx){
+    var s=slots[idx];
+    var el=document.createElement('div');
+    el.style.cssText='width:130px;padding:16px 10px;border:2px solid #a87b3e;border-radius:10px;background:#2c2114;color:#e0b062;text-align:center;cursor:pointer';
+    if(s){ var cn=CLS[s.cls]?CLS[s.cls].n:s.cls; el.innerHTML='<div style="font-size:22px">'+cn.split(' ')[0]+'</div><div style="margin-top:6px;font-size:13px">'+cn.replace(/^\S+\s/,'')+'</div><div style="color:#9a8a6a;font-size:12px;margin-top:4px">Lv '+(s.lv||1)+'</div>'; }
+    else { el.innerHTML='<div style="font-size:22px">➕</div><div style="margin-top:6px;font-size:13px;color:#9a8a6a">Ô Trống</div>'; }
+    el.addEventListener('pointerdown',function(ev){ev.preventDefault();
+      if(ws.readyState===1) ws.send(JSON.stringify({t:'selectslot',slot:idx+1}));
+    });
+    box.appendChild(el);
+  })(i); }
+}
 (function buildPicker(){var box=document.getElementById('pcards');
   var order=['war','mage','arc','blade','cmd'];
   for(var i=0;i<order.length;i++){(function(c){
@@ -1203,10 +1224,19 @@ ws.onmessage=function(e){
  try{
   var m=JSON.parse(e.data);
   if(m.t==='welcome'){myId=m.id;document.getElementById('me').textContent='#'+m.id;}
-  else if(m.t==='loginresult'){
-    var nsBtn=document.getElementById('nameSubmit'); if(nsBtn)nsBtn.disabled=false;
-    if(!m.ok){ document.getElementById('nameMsg').textContent='Tên không hợp lệ, thử lại.'; return; }
-    document.getElementById('nameEntry').style.display='none';
+  else if(m.t==='authresult'){
+    var lsBtn=document.getElementById('loginSubmit'); if(lsBtn)lsBtn.disabled=false;
+    if(!m.ok){
+      var reasonTxt = m.reason==='wrongpass' ? 'Sai mật khẩu.' : m.reason==='nodb' ? 'Server chưa kết nối được lưu trữ, báo admin.' : 'Lỗi đăng nhập, thử lại.';
+      document.getElementById('loginMsg').textContent=reasonTxt; return;
+    }
+    document.getElementById('loginScr').style.display='none';
+    document.getElementById('slotScr').style.display='flex';
+    renderSlots(m.slots||[null,null,null]);
+  }
+  else if(m.t==='slotresult'){
+    if(!m.ok)return;
+    document.getElementById('slotScr').style.display='none';
     if(m.returning){ chosen=true; }
     else { document.getElementById('pick').style.display='flex'; }
   }
@@ -2100,32 +2130,55 @@ const wss = new WebSocketServer({ server });
 wss.on('error', (err) => { console.error('⚠️ Lỗi WebSocketServer (đã chặn):', err && err.message); });
 
 // ==================== LƯU TRỮ THẬT (Postgres/Supabase qua DATABASE_URL) ====================
-// Chỉ lưu các field TIẾN TRÌNH thật (level/đồ/skill/tiền...), KHÔNG lưu state chiến đấu tạm thời
-// (hp hiện tại, cooldown, buff timer...) — những cái đó luôn reset sạch mỗi lần vào lại là đúng.
+// Tài khoản (username+password) → tối đa 3 ô nhân vật/tài khoản, đúng chuẩn MMORPG thật.
+const crypto = require('crypto');
 const SAVE_FIELDS = ['cls','lv','xp','xpNext','gold','stones','STR','VIT','AGI','INT','statPts','skillPts',
   'skRank','loadout','inv','equip','zone','x','y','qk','qc','dailyDate','checkinStreak','checkedToday',
   'npcAccepted','npcClaimed','cum','dungeonEntries','dungeonDate','mounts','mounted','pet','guild','pkScore',
   'gemCount','baseMaxhp'];
+function hashPass(pass,salt){ return crypto.scryptSync(pass,salt,64).toString('hex'); }
 async function dbInit(){
   if(!dbPool)return console.log('⚠️ Chưa có DATABASE_URL — chạy KHÔNG LƯU TRỮ (dữ liệu mất khi restart, chỉ dùng để test tạm).');
   try{
+    await dbPool.query(`CREATE TABLE IF NOT EXISTS accounts (
+      username TEXT PRIMARY KEY, salt TEXT NOT NULL, pass_hash TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW())`);
     await dbPool.query(`CREATE TABLE IF NOT EXISTS characters (
-      name TEXT PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW())`);
-    console.log('✅ Database sẵn sàng (bảng characters).');
+      username TEXT NOT NULL REFERENCES accounts(username), slot INT NOT NULL, data JSONB NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY(username,slot))`);
+    console.log('✅ Database sẵn sàng (bảng accounts + characters).');
   }catch(err){ console.error('⚠️ Lỗi kết nối database lúc khởi động:', err && err.message); }
 }
-async function dbLoadChar(name){
-  if(!dbPool)return null;
-  try{ const r=await dbPool.query('SELECT data FROM characters WHERE name=$1',[name]); return r.rows[0]?r.rows[0].data:null; }
-  catch(err){ console.error('⚠️ Lỗi load nhân vật "'+name+'":', err && err.message); return null; }
+// Trả về: {ok, reason} — reason: 'wrongpass' | 'dberror'. Tự tạo tài khoản mới nếu username chưa tồn tại (đăng ký ngay lúc đăng nhập lần đầu).
+async function dbAuth(username,password){
+  if(!dbPool)return {ok:false,reason:'nodb'};
+  try{
+    const r=await dbPool.query('SELECT salt,pass_hash FROM accounts WHERE username=$1',[username]);
+    if(r.rows.length===0){
+      const salt=crypto.randomBytes(16).toString('hex'); const hash=hashPass(password,salt);
+      await dbPool.query('INSERT INTO accounts(username,salt,pass_hash) VALUES($1,$2,$3)',[username,salt,hash]);
+      return {ok:true,isNew:true};
+    }
+    const row=r.rows[0]; const hash=hashPass(password,row.salt);
+    if(hash!==row.pass_hash) return {ok:false,reason:'wrongpass'};
+    return {ok:true,isNew:false};
+  }catch(err){ console.error('⚠️ Lỗi đăng nhập "'+username+'":', err && err.message); return {ok:false,reason:'dberror'}; }
 }
-async function dbSaveChar(name,p){
-  if(!dbPool||!name||!p.chosen)return;
+async function dbLoadSlots(username){
+  if(!dbPool)return [null,null,null];
+  try{
+    const r=await dbPool.query('SELECT slot,data FROM characters WHERE username=$1',[username]);
+    const slots=[null,null,null];
+    for(const row of r.rows){ if(row.slot>=1&&row.slot<=3) slots[row.slot-1]=row.data; }
+    return slots;
+  }catch(err){ console.error('⚠️ Lỗi tải danh sách nhân vật "'+username+'":', err && err.message); return [null,null,null]; }
+}
+async function dbSaveChar(username,slot,p){
+  if(!dbPool||!username||!slot||!p.chosen)return;
   try{
     const data={}; for(const f of SAVE_FIELDS) data[f]=p[f];
-    await dbPool.query(`INSERT INTO characters(name,data,updated_at) VALUES($1,$2,NOW())
-      ON CONFLICT(name) DO UPDATE SET data=$2, updated_at=NOW()`,[name,JSON.stringify(data)]);
-  }catch(err){ console.error('⚠️ Lỗi lưu nhân vật "'+name+'":', err && err.message); }
+    await dbPool.query(`INSERT INTO characters(username,slot,data,updated_at) VALUES($1,$2,$3,NOW())
+      ON CONFLICT(username,slot) DO UPDATE SET data=$3, updated_at=NOW()`,[username,slot,JSON.stringify(data)]);
+  }catch(err){ console.error('⚠️ Lỗi lưu nhân vật "'+username+'" ô '+slot+':', err && err.message); }
 }
 
 const players = {};
@@ -2198,7 +2251,7 @@ wss.on('connection',(ws)=>{
     dungeonDate:null,dungeonEntries:3,pet:null,mounts:[],mounted:null,fusedT:0,fusionCd:0,hspet:null,hspetApplied:null,
     gemCount:{hoa:0,thuy:0,moc:0,tho:0,kim:0},gemBonus:null,pkScore:0,jailed:0,summon:null,
     basicType:'melee',basicRange:90,basicDmg:18,basicCd:0.45,basicSpd:0,basicR:6,basicKind:'melee',
-    cd:{b:0,q:0,w:0,e:0,r:0},charName:null};
+    cd:{b:0,q:0,w:0,e:0,r:0},charUser:null,charSlot:null};
   ws.pid=id; sockets[id]=ws;
   ws.send(JSON.stringify({t:'welcome',id}));
   ws.send(JSON.stringify({t:'zones',zones:ZONES}));
@@ -2210,11 +2263,25 @@ wss.on('connection',(ws)=>{
   ws.on('message',(buf)=>{
     let m; try{m=JSON.parse(buf.toString());}catch(e){return;}
     const p=players[id]; if(!p)return;
-    if(m.t==='login'){
-      const name=(''+(m.name||'')).trim().slice(0,20);
-      if(!name){ sendTo(id,{t:'loginresult',ok:false}); return; }
-      p.charName=name;
-      dbLoadChar(name).then(saved=>{
+    if(m.t==='authlogin'){
+      const user=(''+(m.user||'')).trim().slice(0,20);
+      const pass=''+(m.pass||'');
+      if(!user||pass.length<3){ sendTo(id,{t:'authresult',ok:false,reason:'invalid'}); return; }
+      dbAuth(user,pass).then(r=>{
+        if(!r.ok){ sendTo(id,{t:'authresult',ok:false,reason:r.reason}); return; }
+        p.charUser=user;
+        dbLoadSlots(user).then(slots=>{
+          const summary=slots.map(s=>s?{cls:s.cls,lv:s.lv||1}:null);
+          sendTo(id,{t:'authresult',ok:true,isNew:r.isNew,slots:summary});
+        });
+      });
+      return;
+    }
+    if(m.t==='selectslot'){
+      const slot=m.slot|0; if(!p.charUser||slot<1||slot>3)return;
+      dbLoadSlots(p.charUser).then(slots=>{
+        const saved=slots[slot-1];
+        p.charSlot=slot;
         if(saved && saved.cls && CLASSES[saved.cls]){
           const c=CLASSES[saved.cls];
           Object.assign(p,saved);
@@ -2225,10 +2292,10 @@ wss.on('connection',(ws)=>{
           sendInv(p,id); sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout}); sendQuests(p,id); sendGuildData(id);
           sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
           ensureDungeon(p); sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
-          sendTo(id,{t:'loginresult',ok:true,returning:true});
-          console.log('👤 "'+name+'" đăng nhập lại — khôi phục nhân vật '+saved.cls+' Lv'+(saved.lv||1));
+          sendTo(id,{t:'slotresult',ok:true,returning:true});
+          console.log('👤 "'+p.charUser+'" ô '+slot+' — khôi phục nhân vật '+saved.cls+' Lv'+(saved.lv||1));
         } else {
-          sendTo(id,{t:'loginresult',ok:true,returning:false});
+          sendTo(id,{t:'slotresult',ok:true,returning:false});
         }
       });
       return;
@@ -2249,6 +2316,7 @@ wss.on('connection',(ws)=>{
         sendInv(p,id); sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout}); sendQuests(p,id); sendGuildData(id);
         sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
         ensureDungeon(p); sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
+        if(p.charUser&&p.charSlot) dbSaveChar(p.charUser,p.charSlot,p);
       }catch(err){
         console.error('⚠️ Lỗi khi #'+id+' chọn class '+m.c+':', err && err.message);
         p.chosen=false; // cho phép thử chọn lại thay vì kẹt màn hình trống
@@ -2347,7 +2415,7 @@ wss.on('connection',(ws)=>{
   ws.on('close',()=>{ const p=players[id]; if(p&&p.party&&parties[p.party]){ const pt=parties[p.party];
       pt.members=pt.members.filter(m=>m!==id);
       if(pt.members.length===0)delete parties[p.party]; else { if(pt.leader===id)pt.leader=pt.members[0]; sendPartyUpdate(p.party); } }
-    if(p&&p.charName&&p.chosen) dbSaveChar(p.charName,p);
+    if(p&&p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p);
     delete players[id]; delete sockets[id]; });
 });
 
@@ -4076,7 +4144,7 @@ setInterval(()=>{
 },TICK);
 function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*100)/100;}
 
-setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charName&&p.chosen) dbSaveChar(p.charName,p); } }, 60000);
+setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.10 (LƯU TRỮ THẬT + nhập tên nhân vật) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.20 (tài khoản thật + 3 ô nhân vật) chạy ở cổng '+PORT));
