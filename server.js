@@ -633,11 +633,26 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.20 · tài khoản thật (ID+MK) + 3 ô nhân vật</div>
+  <div id="ver">v1.40 · chuyển hẳn sang pixel art thật (khối vuông)</div>
 </div>
 <script>
 var WW=800, WH=600;
-var cv=document.getElementById('c'), ctx=cv.getContext('2d');
+var cv=document.getElementById('c'), ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
+var CHAR_GRID=['.111.','11211','.222.','33333','33333','33333','33333','55.55','55.55'];
+function drawPixelChar(px,py,hue,cls,fx,fy){
+  var PS=3.2, w=CHAR_GRID[0].length, h=CHAR_GRID.length;
+  var sx=px-(w*PS)/2, sy=py-(h*PS)/2-4;
+  var bodyCol='hsl('+hue+',60%,48%)', darkCol='hsl('+hue+',60%,26%)';
+  var colors={'1':'#3a2a1a','2':'#e0b088','3':bodyCol,'5':darkCol};
+  for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ var ch=CHAR_GRID[r][c]; if(ch==='.')continue;
+    ctx.fillStyle=colors[ch]; ctx.fillRect(Math.round(sx+c*PS),Math.round(sy+r*PS),Math.ceil(PS),Math.ceil(PS)); } }
+  var wx=px+fx*13, wy=py+fy*13;
+  if(cls==='war'){ ctx.fillStyle='#c8c8d0'; ctx.fillRect(Math.round(wx-3),Math.round(wy-9),6,17); ctx.fillStyle='#6a4a2a'; ctx.fillRect(Math.round(wx-2),Math.round(wy+6),4,5); }
+  else if(cls==='mage'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-1.5),Math.round(wy-10),3,20); ctx.fillStyle='#c9a8ff'; ctx.fillRect(Math.round(wx-3),Math.round(wy-14),6,6); }
+  else if(cls==='arc'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-2),Math.round(wy-9),4,18); }
+  else if(cls==='cmd'){ ctx.fillStyle='#d9a04a'; ctx.fillRect(Math.round(px-15),Math.round(py-4),5,5); ctx.fillRect(Math.round(px+10),Math.round(py-4),5,5);
+    ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2),Math.round(py-27),3,10); ctx.fillRect(Math.round(px+1),Math.round(py-25),8,6); }
+}
 var scr={w:0,h:0,scale:1,ox:0,oy:0,dpr:1};
 function resize(){
   scr.dpr=Math.min(devicePixelRatio||1,2);
@@ -1827,14 +1842,33 @@ function frame(now){
     ctx.globalAlpha=1;
   }
 
+  var MOB_GRIDS={
+    beast:  ['.5.5.','55555','55555','5.5.5'],
+    crawler:['.5.5.','.555.','55555','5.5.5'],
+    brute:  ['55555','55555','55555','5.5.5'],
+    flyer:  ['5.5.5','55555','.555.','..5..'],
+    ghost:  ['.555.','55555','55555','5.5.5'],
+    skeleton:['.555.','55555','.555.','5.5.5']
+  };
+  function drawMobPixel(cx,cy,er,hue,shape){
+    var g=MOB_GRIDS[shape]||MOB_GRIDS.brute; var w=g[0].length,h=g.length;
+    var ps=(er*2.1)/w; var sx=cx-(w*ps)/2, sy=cy-(h*ps)/2;
+    ctx.fillStyle='hsl('+hue+',55%,42%)';
+    for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ if(g[r][c]==='.')continue;
+      ctx.fillRect(Math.round(sx+c*ps),Math.round(sy+r*ps),Math.ceil(ps),Math.ceil(ps)); } }
+  }
   for(var eid in enemies){var en=enemies[eid];if(en.dead||en.zone!==myZone)continue;var er=en.r||14;
-    ctx.fillStyle=en.boss?'#8a2f6a':'#b8514d';ctx.strokeStyle=en.boss?'#4a1838':'#7a2f2c';ctx.lineWidth=en.boss?3:2;
-    ctx.beginPath();ctx.arc(en.x,en.y,er,0,7);ctx.fill();ctx.stroke();
+    var mhue=en.boss?330:(en.mhue!==undefined?en.mhue:5);
+    var msh=en.boss?null:en.mshape;
+    if(en.boss){ ctx.fillStyle='#8a2f6a';ctx.strokeStyle='#4a1838';ctx.lineWidth=3;ctx.beginPath();ctx.arc(en.x,en.y,er,0,7);ctx.fill();ctx.stroke(); }
+    else if(msh && MOB_GRIDS[msh]){ drawMobPixel(en.x,en.y,er,mhue,msh); }
+    else { ctx.fillStyle='hsl('+mhue+',55%,42%)';ctx.fillRect(Math.round(en.x-er*0.8),Math.round(en.y-er*0.8),Math.round(er*1.6),Math.round(er*1.6)); }
     if(en.rooted){ ctx.globalAlpha=0.4; ctx.fillStyle='#8a4a2a'; ctx.beginPath(); ctx.arc(en.x,en.y,er,0,7); ctx.fill(); ctx.globalAlpha=1; }
     else if(en.slowed){ ctx.globalAlpha=0.35; ctx.fillStyle='#5ab0e0'; ctx.beginPath(); ctx.arc(en.x,en.y,er,0,7); ctx.fill(); ctx.globalAlpha=1; }
     var bw=en.boss?70:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-er-10,bw,en.boss?6:4);
     ctx.fillStyle=en.boss?'#e07ab8':'#d06a55';ctx.fillRect(en.x-bw/2,en.y-er-10,bw*Math.max(0,en.hp)/en.maxhp,en.boss?6:4);
     if(en.boss){ctx.fillStyle='#ffb0e0';ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillText('BOSS',en.x,en.y-er-16);}
+    else if(en.mname){ctx.fillStyle='#c9b896';ctx.font='10px Trebuchet MS';ctx.textAlign='center';ctx.fillText(en.mname,en.x,en.y-er-14);}
     var stIc=''; if(en.wound>0)stIc+='🩸'; if(en.shred)stIc+='💢'; if(en.weak)stIc+='📢'; if(en.marked)stIc+='🎯'; if(en.arcmarked)stIc+='🔮'; if(en.ravenmarked)stIc+='🐦'; if(en.bladefrost)stIc+='🧊'; if(en.rooted)stIc+='⛓️'; else if(en.slowed)stIc+='❄️';
     if(stIc){ ctx.font='11px serif';ctx.textAlign='center';ctx.fillText(stIc,en.x,en.y-er-(en.boss?24:16)); }}
 
@@ -1932,8 +1966,8 @@ function frame(now){
     if(yOff!==0){ ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(rx,ry+15,13,4,0,0,7);ctx.fill();ctx.restore(); ry+=yOff; }
     var bodyR=15;
     ctx.globalAlpha=p.dead?0.25:1;
-    ctx.fillStyle='hsl('+p.hue+',70%,58%)';ctx.strokeStyle='#0d0a06';ctx.lineWidth=3;
-    ctx.beginPath();ctx.arc(rx,ry,bodyR,0,7);ctx.fill();ctx.stroke();
+    var bfa=Math.atan2(ffy,ffx);
+    drawPixelChar(rx,ry,p.hue,p.cls,ffx,ffy);
     if(p.cls==='blade' && !p.dead){ ctx.save();ctx.font='13px serif';ctx.textAlign='center';
       ctx.fillText(p.bladeStance==='arcane'?'🔮':'🗡️',rx+ffx*17,ry+ffy*17+4); ctx.restore(); }
     if(p.rooted){ ctx.globalAlpha=0.4; ctx.fillStyle='#8a4a2a'; ctx.beginPath(); ctx.arc(rx,ry,bodyR,0,7); ctx.fill(); ctx.globalAlpha=p.dead?0.25:1; }
@@ -2146,7 +2180,12 @@ async function dbInit(){
       username TEXT NOT NULL REFERENCES accounts(username), slot INT NOT NULL, data JSONB NOT NULL,
       updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY(username,slot))`);
     console.log('✅ Database sẵn sàng (bảng accounts + characters).');
-  }catch(err){ console.error('⚠️ Lỗi kết nối database lúc khởi động:', err && err.message); }
+  }catch(err){
+    console.error('⚠️ Lỗi kết nối database lúc khởi động:', err && err.message);
+    if(err && err.message && err.message.includes('ENETUNREACH') && err.message.includes('::')){
+      console.error('👉 Đây là lỗi IPv6 — DATABASE_URL đang dùng "Direct connection" của Supabase (db.xxx.supabase.co). Đổi sang chuỗi "Transaction pooler" (dạng aws-0-xxx.pooler.supabase.com:6543) trong Supabase → Connect, rồi cập nhật lại DATABASE_URL trên Render.');
+    }
+  }
 }
 // Trả về: {ok, reason} — reason: 'wrongpass' | 'dberror'. Tự tạo tài khoản mới nếu username chưa tồn tại (đăng ký ngay lúc đăng nhập lần đầu).
 async function dbAuth(username,password){
@@ -2194,13 +2233,32 @@ let dotZones = [];
 const sockets = {};
 let nextP = 1, nextE = 1, nextL = 1;
 
+const MOB_TYPES = {
+  forest: [
+    {id:'wolf', name:'Sói Rừng', hue:22, hpMul:0.8, spdMul:1.35, dmgMul:0.9, shape:'beast'},
+    {id:'spider', name:'Nhện Độc', hue:280, hpMul:1.0, spdMul:1.0, dmgMul:1.1, shape:'crawler'},
+    {id:'goblin', name:'Yêu Tinh Lá', hue:100, hpMul:1.3, spdMul:0.8, dmgMul:1.0, shape:'brute'},
+  ],
+  cave: [
+    {id:'bat', name:'Dơi Băng', hue:200, hpMul:0.7, spdMul:1.5, dmgMul:0.85, shape:'flyer'},
+    {id:'beetle', name:'Bọ Đá', hue:40, hpMul:1.6, spdMul:0.6, dmgMul:1.0, shape:'brute'},
+    {id:'wraith', name:'Ma Sương', hue:220, hpMul:1.0, spdMul:1.0, dmgMul:1.2, shape:'ghost'},
+  ],
+  dungeon: [
+    {id:'skeleton', name:'Xương Cổ', hue:48, hpMul:1.2, spdMul:0.9, dmgMul:1.1, shape:'skeleton'},
+    {id:'shade', name:'Bóng Đêm', hue:265, hpMul:0.9, spdMul:1.2, dmgMul:1.05, shape:'ghost'},
+  ],
+};
 function spawnEnemy(zone){
   const id = nextE++; const z=ZONES[zone];
   const edge = Math.floor(Math.random()*4), m=40; let x,y;
   if(edge===0){x=Math.random()*z.w;y=m;} else if(edge===1){x=z.w-m;y=Math.random()*z.h;}
   else if(edge===2){x=Math.random()*z.w;y=z.h-m;} else {x=m;y=Math.random()*z.h;}
   const tier=z.tier||1;
-  enemies[id]={x,y,zone,hp:70*tier,maxhp:70*tier,spd:52,atk:0,dead:false,respawnT:0,xp:24*tier,gold:6*tier,r:14,boss:false,dmg:6*tier};
+  const pool=MOB_TYPES[zone]||MOB_TYPES.forest; const mt=pool[Math.floor(Math.random()*pool.length)];
+  const hp=Math.round(70*tier*mt.hpMul);
+  enemies[id]={x,y,zone,hp,maxhp:hp,spd:Math.round(52*mt.spdMul),atk:0,dead:false,respawnT:0,xp:24*tier,gold:6*tier,r:14,boss:false,
+    dmg:Math.round(6*tier*mt.dmgMul),mtype:mt.id,mname:mt.name,mhue:mt.hue,mshape:mt.shape};
 }
 function spawnBoss(zone){
   const id=nextE++; const z=ZONES[zone]; const tier=z.tier||1;
@@ -4111,7 +4169,7 @@ setInterval(()=>{
     }catch(err){ console.error('⚠️ Lỗi tính state công khai cho #'+id+':', err && err.message); }
   }
   const es={}; for(const eid in enemies){const e=enemies[eid];
-    es[eid]={x:r1(e.x),y:r1(e.y),zone:e.zone,hp:r1(e.hp),maxhp:e.maxhp,dead:e.dead,boss:e.boss,r:e.r,
+    es[eid]={x:r1(e.x),y:r1(e.y),zone:e.zone,hp:r1(e.hp),maxhp:e.maxhp,dead:e.dead,boss:e.boss,r:e.r,mname:e.mname||null,mhue:e.mhue,mshape:e.mshape,
       wound:statusStacks(e,'wound'),shred:!!getStatus(e,'shred'),weak:(e.atkDebuffT>0),marked:!!getStatus(e,'huntmark'),arcmarked:!!getStatus(e,'arcmark'),ravenmarked:!!getStatus(e,'ravenmark'),bladefrost:!!getStatus(e,'bladefrost'),
       slowed:(e.slowT>0&&(e.slowMul||1)>=0.15),rooted:(e.slowT>0&&(e.slowMul||1)<0.15)};}
   const bs=bolts.map(b=>({x:r1(b.x),y:r1(b.y),zone:b.zone,hue:b.hue,kind:b.kind||'bolt',r:b.r||6,a:r2(Math.atan2(b.vy,b.vx))}));
@@ -4147,4 +4205,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.20 (tài khoản thật + 3 ô nhân vật) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.40 (chuyển sang pixel art thật) chạy ở cổng '+PORT));
