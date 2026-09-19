@@ -633,7 +633,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.50 · to hơn rõ chân/vũ khí + quái nhận diện được</div>
+  <div id="ver">v1.60 · quái đúng hình dạng thật + Boss pixel riêng</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -1846,13 +1846,14 @@ function frame(now){
     ctx.globalAlpha=1;
   }
 
+  var BOSS_GRID=['..o...o..','.oo.o.oo.','..ooooo..','.oo.o.oo.','..ooooo..','...ooo...','.ooooooo.','ooooooooo','ooooooooo','ooooooooo','.ooooooo.','o.o...o.o','o.o...o.o'];
   var MOB_GRIDS={
-    beast:   ['o.....o','.ooooo.','ooooooo','ooooooo','.ooooo.','o.o.o.o','.......'],
+    beast:   ['....o.o..','...ooooo.','oooooooo.','oooooooo.','.o.o.o.o.','.........'],
     crawler: ['o.....o','.o...o.','..ooo..','.ooooo.','..ooo..','.o...o.','o.....o'],
-    brute:   ['..ooo..','.ooooo.','ooooooo','ooooooo','ooooooo','o.....o','o.....o'],
+    brute:   ['..ooo..','.ooooo.','..ooo..','ooooooo','ooooooo','o.....o','o.....o','o.....o'],
     flyer:   ['o.....o','oo...oo','ooo.ooo','.ooooo.','..ooo..','..o.o..','.......'],
-    ghost:   ['..ooo..','.ooooo.','ooooooo','ooooooo','ooooooo','o.o.o.o','o.o.o.o'],
-    skeleton:['..ooo..','.o...o.','..ooo..','o.o.o.o','.ooooo.','o.....o','o.....o']
+    ghost:   ['..ooo..','.ooooo.','ooooooo','ooooooo','ooooooo','o.o.o.o','.o.o.o.'],
+    skeleton:['.ooooo.','oo.o.oo','.ooooo.','..ooo..','o.o.o.o','.ooooo.','o.....o']
   };
   function drawMobPixel(cx,cy,er,hue,shape){
     var g=MOB_GRIDS[shape]||MOB_GRIDS.brute; var w=g[0].length;
@@ -1862,12 +1863,17 @@ function frame(now){
   for(var eid in enemies){var en=enemies[eid];if(en.dead||en.zone!==myZone)continue;var er=en.r||14;
     var mhue=en.boss?330:(en.mhue!==undefined?en.mhue:5);
     var msh=en.boss?null:en.mshape;
-    if(en.boss){ ctx.fillStyle='#8a2f6a';ctx.strokeStyle='#4a1838';ctx.lineWidth=3;ctx.beginPath();ctx.arc(en.x,en.y,er,0,7);ctx.fill();ctx.stroke(); }
+    if(en.boss){
+      var bossPulse=(Math.sin(performance.now()/300)+1)/2;
+      var bossCol={'o':'#7a1838'}; drawPixelGrid(BOSS_GRID,bossCol,en.x,en.y,er*0.31);
+      ctx.save();ctx.globalAlpha=0.5+bossPulse*0.3;ctx.strokeStyle='#ff4a7a';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(en.x,en.y,er+4+bossPulse*3,0,7);ctx.stroke();ctx.restore();
+    }
     else if(msh && MOB_GRIDS[msh]){ drawMobPixel(en.x,en.y,er,mhue,msh); }
     else { ctx.fillStyle='hsl('+mhue+',55%,42%)';ctx.fillRect(Math.round(en.x-er*0.8),Math.round(en.y-er*0.8),Math.round(er*1.6),Math.round(er*1.6)); }
     if(en.rooted){ ctx.globalAlpha=0.4; ctx.fillStyle='#8a4a2a'; ctx.beginPath(); ctx.arc(en.x,en.y,er,0,7); ctx.fill(); ctx.globalAlpha=1; }
     else if(en.slowed){ ctx.globalAlpha=0.35; ctx.fillStyle='#5ab0e0'; ctx.beginPath(); ctx.arc(en.x,en.y,er,0,7); ctx.fill(); ctx.globalAlpha=1; }
-    var bw=en.boss?70:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-er-10,bw,en.boss?6:4);
+    var bw=en.boss?110:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-er-10,bw,en.boss?6:4);
     ctx.fillStyle=en.boss?'#e07ab8':'#d06a55';ctx.fillRect(en.x-bw/2,en.y-er-10,bw*Math.max(0,en.hp)/en.maxhp,en.boss?6:4);
     if(en.boss){ctx.fillStyle='#ffb0e0';ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillText('BOSS',en.x,en.y-er-16);}
     else if(en.mname){ctx.fillStyle='#c9b896';ctx.font='10px Trebuchet MS';ctx.textAlign='center';ctx.fillText(en.mname,en.x,en.y-er-14);}
@@ -1976,7 +1982,7 @@ function frame(now){
     else if(p.slowed){ ctx.globalAlpha=0.35; ctx.fillStyle='#5ab0e0'; ctx.beginPath(); ctx.arc(rx,ry,bodyR,0,7); ctx.fill(); ctx.globalAlpha=p.dead?0.25:1; }
     if(!p.dead){ctx.strokeStyle='#ffe0a0';ctx.lineWidth=3;ctx.beginPath();
       ctx.moveTo(rx,ry);ctx.lineTo(rx+ffx*22,ry+ffy*22);ctx.stroke();}
-    if(id==myId){ctx.strokeStyle='#ffe0a0';ctx.lineWidth=2;ctx.beginPath();ctx.arc(rx,ry,20,0,7);ctx.stroke();}
+    
     if(p.sh){ctx.strokeStyle='#6bc4ff';ctx.lineWidth=2;ctx.globalAlpha=0.85;ctx.beginPath();ctx.arc(rx,ry,19,0,7);ctx.stroke();ctx.globalAlpha=p.dead?0.25:1;}
     if(p.mt){ctx.save();ctx.globalAlpha=0.55;ctx.fillStyle='#5a3a1a';ctx.beginPath();ctx.ellipse(rx,ry+16,20,9,0,0,7);ctx.fill();ctx.restore();}
     if(p.braceT>0){ ctx.save();ctx.globalAlpha=0.8;ctx.fillStyle='#c9a86a';ctx.strokeStyle='#8a6a2a';ctx.lineWidth=2;
@@ -4207,4 +4213,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.50 (to hơn + quái nhận diện được) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.60 (quái đúng hình dạng + Boss pixel riêng) chạy ở cổng '+PORT));
