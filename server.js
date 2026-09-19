@@ -637,7 +637,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="ic"></span><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v3.00 · SPRITE THẬT (Kenney CC0) — nhân vật + quái</div>
+  <div id="ver">v3.01 · SỬA GỐC — camera chậm 1 khung hình so với nhân vật</div>
 </div>
 <script>
 var WW=560, WH=420;
@@ -1634,7 +1634,23 @@ function frame(now){
   var zd=ZONEDATA[myZone]||{w:900,h:700,bg:'#14100c',portals:[]};
   ctx.fillStyle=zd.bg||'#14100c';ctx.fillRect(0,0,WW,WH);
 
+  // --- DỰ ĐOÁN vị trí nhân vật MÌNH (client prediction) — PHẢI chạy TRƯỚC khi camera tính theo dõi,
+  //     nếu không camera sẽ dùng vị trí cũ của khung hình trước, chậm sau nhân vật đúng 1 khung ---
   var meNow=players[myId];
+  if(meNow && !meNow.dead){
+    var justReset=(myPX===null);
+    if(justReset){myPX=meNow.x;myPY=meNow.y;myFX=meNow.fx;myFY=meNow.fy;}
+    else {
+      var pmx=joy.mag>0.15?joy.dx:0, pmy=joy.mag>0.15?joy.dy:0;
+      var spd=meNow.spd||250; if(meNow.bcd)SKdur.b=meNow.bcd;
+      myPX+=pmx*spd*dt; myPY+=pmy*spd*dt;
+      myPX=Math.max(15,Math.min(zd.w-15,myPX)); myPY=Math.max(15,Math.min(zd.h-15,myPY));
+      var gap=Math.hypot(meNow.x-myPX,meNow.y-myPY);
+      if(gap>110){myPX+=(meNow.x-myPX)*0.5;myPY+=(meNow.y-myPY)*0.5;} else {myPX+=(meNow.x-myPX)*0.35;myPY+=(meNow.y-myPY)*0.35;}
+      if(joy.mag>0.2){myFX=joy.dx;myFY=joy.dy;} else {myFX=meNow.fx;myFY=meNow.fy;}
+    }
+  } else { myPX=null; }
+
   var followX = (myPX!==null?myPX:(meNow?meNow.x:zd.w/2));
   var followY = (myPY!==null?myPY:(meNow?meNow.y:zd.h/2));
   var camX = zd.w<=WW ? zd.w/2 : Math.max(WW/2,Math.min(zd.w-WW/2,followX));
@@ -2057,22 +2073,6 @@ function frame(now){
       ctx.globalAlpha=0.4;ctx.beginPath();ctx.moveTo(-22,0);ctx.lineTo(-16,-4);ctx.lineTo(-16,4);ctx.closePath();ctx.fill();ctx.restore();}
     else {ctx.beginPath();ctx.arc(bl.x,bl.y,br,0,7);ctx.fill();}
     ctx.shadowBlur=0;ctx.restore();}
-
-  // --- DỰ ĐOÁN vị trí nhân vật MÌNH (client prediction) cho mượt tức thì ---
-  var me=players[myId];
-  if(me && !me.dead){
-    var justReset=(myPX===null);
-    if(justReset){myPX=me.x;myPY=me.y;myFX=me.fx;myFY=me.fy;}
-    else {
-      var pmx=joy.mag>0.15?joy.dx:0, pmy=joy.mag>0.15?joy.dy:0;
-      var spd=me.spd||250; if(me.bcd)SKdur.b=me.bcd;
-      myPX+=pmx*spd*dt; myPY+=pmy*spd*dt;
-      myPX=Math.max(15,Math.min(zd.w-15,myPX)); myPY=Math.max(15,Math.min(zd.h-15,myPY));
-      var gap=Math.hypot(me.x-myPX,me.y-myPY);
-      if(gap>110){myPX+=(me.x-myPX)*0.5;myPY+=(me.y-myPY)*0.5;} else {myPX+=(me.x-myPX)*0.35;myPY+=(me.y-myPY)*0.35;}
-      if(joy.mag>0.2){myFX=joy.dx;myFY=joy.dy;} else {myFX=me.fx;myFY=me.fy;}
-    }
-  } else { myPX=null; }
 
   for(var id in players){var p=players[id]; if(p.zone!==myZone)continue;
     var rx,ry,ffx,ffy;
@@ -4324,4 +4324,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v3.00 (SPRITE THẬT Kenney CC0) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v3.01 (SỬA GỐC: camera chậm 1 khung) chạy ở cổng '+PORT));
