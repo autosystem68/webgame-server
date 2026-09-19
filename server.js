@@ -332,7 +332,9 @@ const CLIENT = `<!doctype html>
   .sk{position:absolute;border-radius:50%;background:radial-gradient(circle at 35% 30%,#2c2114,#171009);
     border:2px solid #a87b3e;color:#e0b062;display:flex;flex-direction:column;align-items:center;justify-content:center;
     font-weight:bold;box-shadow:0 3px 12px #000a}
-  .sk .k{font-size:16px;line-height:1}.sk .l{font-size:8px;color:#9a8a6a}
+  .sk .k{position:absolute;top:2px;left:4px;font-size:10px;line-height:1;background:#000a;border-radius:4px;padding:1px 3px;color:#e0b062}
+  .sk .ic{font-size:22px;line-height:1;display:block}
+  .sk .l{font-size:7px;color:#9a8a6a;display:block;margin-top:1px}
   .sk .m{position:absolute;bottom:-3px;font-size:8px;color:#8fc4ff;background:#000b;padding:0 3px;border-radius:4px}
   .sk:active{transform:scale(.93)}
   .sk .cd{position:absolute;inset:0;border-radius:50%;background:conic-gradient(#000c var(--d,0deg),transparent 0deg)}
@@ -629,13 +631,13 @@ const CLIENT = `<!doctype html>
   <div id="cluster">
     <div class="sk" id="sSwap" style="display:none;background:radial-gradient(circle,#3a2a5a,#1a1030)"><span class="k">⇄</span><span class="l" id="swapLbl">KIẾM</span><div class="cd"></div></div>
     <div class="sk basic" id="sB"><span class="k">⚔</span><span class="l">THƯỜNG</span><div class="cd"></div></div>
-    <div class="sk" id="sQ"><span class="k">Q</span><span class="l">LƯỚT</span><span class="m">12</span><div class="cd"></div></div>
-    <div class="sk" id="sW"><span class="k">W</span><span class="l">TIA</span><span class="m">18</span><div class="cd"></div></div>
-    <div class="sk" id="sE"><span class="k">E</span><span class="l">NỔ</span><span class="m">30</span><div class="cd"></div></div>
-    <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
+    <div class="sk" id="sQ"><span class="ic"></span><span class="k">Q</span><span class="l">LƯỚT</span><span class="m">12</span><div class="cd"></div></div>
+    <div class="sk" id="sW"><span class="ic"></span><span class="k">W</span><span class="l">TIA</span><span class="m">18</span><div class="cd"></div></div>
+    <div class="sk" id="sE"><span class="ic"></span><span class="k">E</span><span class="l">NỔ</span><span class="m">30</span><div class="cd"></div></div>
+    <div class="sk" id="sR"><span class="ic"></span><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v2.00 · sửa gốc zoom camera + đặt tên nhân vật thật</div>
+  <div id="ver">v2.20 · địa hình 12 loại riêng theo 3 vùng (Rừng/Băng/Mật Thất)</div>
 </div>
 <script>
 var WW=560, WH=420;
@@ -677,25 +679,54 @@ function drawPixelChar(px,py,hue,cls,fx,fy,moving){
     ctx.strokeStyle='#c9b090';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(6,0);ctx.lineTo(0,11);ctx.stroke();
     ctx.restore();
   } else if(cls==='cmd'){ ctx.fillStyle='#d9a04a'; ctx.fillRect(Math.round(px-19),Math.round(py-11),7,7); ctx.fillRect(Math.round(px+12),Math.round(py-11),7,7);
-    ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2.5),Math.round(py-36),4,13); ctx.fillRect(Math.round(px+1.5),Math.round(py-33),10,8); }
+    ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2.5),Math.round(py-36),4,13); ctx.fillRect(Math.round(px+1.5),Math.round(py-33),10,8);
+    ctx.save();ctx.translate(holdX,holdY);ctx.rotate(ang);
+    ctx.fillStyle='#5a4a2a';ctx.fillRect(-6,-3,6,6);
+    ctx.fillStyle='#9a9a8a';
+    for(var cLink=0;cLink<5;cLink++){ ctx.fillRect(2+cLink*4,-2,3,4); }
+    ctx.restore();
+  }
 }
 var scr={w:0,h:0,scale:1,ox:0,oy:0,dpr:1};
 var TREE_GRID=['..ggg..','.ggggg.','ggggggg','.ggggg.','...t...','...t...','...t...'];
 var ROCK_GRID=['..rrr..','.rrrrr.','rrrrrrr','rrrrrrr','.rrrrr.'];
-var TREE_COL={'g':'#2a4a1e','t':'#4a3018'};
-var ROCK_COL={'r':'#4a4842'};
+var POND_GRID=['.oooo..','oooooo.','ooooooo','.ooooo.','..ooo..'];
+var HUT_GRID=['..ooo..','.ooooo.','ooooooo','o.....o','o.o.o.o','ooooooo'];
+var SPIKE_GRID=['...o...','..ooo..','.ooooo.','ooooooo','.ooooo.'];
+var CLUSTER_GRID=['o.o.o.o','ooooooo','.ooooo.'];
+var PILLAR_GRID=['.ooooo.','.ooooo.','.ooooo.','ooooooo','.ooooo.','.ooooo.'];
+var RUBBLE_GRID=['o.o.o.o','.ooooo.','oo.o.oo'];
+var DECOR_TYPES={
+  tree:{grid:TREE_GRID,col:{'g':'#2a4a1e','t':'#4a3018'}},
+  rock:{grid:ROCK_GRID,col:{'r':'#4a4842'}},
+  pond:{grid:POND_GRID,col:{'o':'#1a4a5a'}},
+  hut:{grid:HUT_GRID,col:{'o':'#3a2818'}},
+  icespike:{grid:SPIKE_GRID,col:{'o':'#a8d8e8'}},
+  frock:{grid:ROCK_GRID,col:{'r':'#6a828a'}},
+  icecluster:{grid:CLUSTER_GRID,col:{'o':'#d8f0f8'}},
+  fpond:{grid:POND_GRID,col:{'o':'#3a7a8a'}},
+  pillar:{grid:PILLAR_GRID,col:{'o':'#4a4438'}},
+  rubble:{grid:RUBBLE_GRID,col:{'o':'#38322a'}},
+  drock:{grid:ROCK_GRID,col:{'r':'#3a2838'}},
+  bones:{grid:CLUSTER_GRID,col:{'o':'#c9b896'}}
+};
 var ZONE_DECOR={
   forest:[{t:'tree',x:150,y:150},{t:'tree',x:680,y:120},{t:'tree',x:120,y:520},{t:'tree',x:770,y:480},
     {t:'tree',x:400,y:90},{t:'tree',x:820,y:280},{t:'rock',x:250,y:350},{t:'rock',x:600,y:600},
     {t:'tree',x:1100,y:180},{t:'tree',x:1380,y:400},{t:'tree',x:1200,y:750},{t:'tree',x:950,y:950},
-    {t:'rock',x:1050,y:550},{t:'rock',x:1420,y:850},{t:'tree',x:300,y:900},{t:'tree',x:1300,y:120}],
-  cave:[{t:'rock',x:120,y:130},{t:'rock',x:750,y:150},{t:'rock',x:200,y:550},{t:'rock',x:700,y:520},
-    {t:'rock',x:450,y:100},{t:'rock',x:850,y:350},{t:'tree',x:100,y:350},
-    {t:'rock',x:1150,y:200},{t:'rock',x:1400,y:500},{t:'rock',x:1250,y:800},{t:'rock',x:1000,y:950},
-    {t:'rock',x:1450,y:900},{t:'rock',x:550,y:900}],
-  dungeon:[{t:'rock',x:130,y:120},{t:'rock',x:820,y:140},{t:'rock',x:180,y:500},{t:'rock',x:780,y:480},
-    {t:'rock',x:480,y:600},{t:'rock',x:1150,y:250},{t:'rock',x:1200,y:700},{t:'rock',x:950,y:850},
-    {t:'rock',x:350,y:850}]
+    {t:'rock',x:1050,y:550},{t:'rock',x:1420,y:850},{t:'tree',x:300,y:900},{t:'tree',x:1300,y:120},
+    {t:'pond',x:500,y:500},{t:'pond',x:1150,y:600},{t:'hut',x:900,y:250},{t:'hut',x:230,y:750}],
+  cave:[{t:'frock',x:120,y:130},{t:'frock',x:750,y:150},{t:'frock',x:200,y:550},{t:'frock',x:700,y:520},
+    {t:'frock',x:450,y:100},{t:'frock',x:850,y:350},{t:'icespike',x:100,y:350},
+    {t:'frock',x:1150,y:200},{t:'frock',x:1400,y:500},{t:'icespike',x:1250,y:800},{t:'frock',x:1000,y:950},
+    {t:'frock',x:1450,y:900},{t:'frock',x:550,y:900},
+    {t:'icespike',x:300,y:200},{t:'icespike',x:900,y:650},{t:'icecluster',x:600,y:250},
+    {t:'icecluster',x:1300,y:350},{t:'fpond',x:750,y:750},{t:'fpond',x:200,y:800}],
+  dungeon:[{t:'pillar',x:130,y:120},{t:'pillar',x:820,y:140},{t:'pillar',x:180,y:500},{t:'pillar',x:780,y:480},
+    {t:'drock',x:480,y:600},{t:'drock',x:1150,y:250},{t:'drock',x:1200,y:700},{t:'drock',x:950,y:850},
+    {t:'drock',x:350,y:850},{t:'rubble',x:300,y:300},{t:'rubble',x:900,y:400},{t:'rubble',x:600,y:800},
+    {t:'bones',x:1050,y:180},{t:'bones',x:400,y:450}]
+};
 };
 function resize(){
   scr.dpr=Math.min(devicePixelRatio||1,2);
@@ -1480,6 +1511,7 @@ function refreshSkillLabels(){
     var isEmpty=(kk!=='b' && !d.name);
     el.classList.toggle('empty', isEmpty);
     var kEl=el.querySelector('.k'); if(kEl && kk!=='b') kEl.textContent = isEmpty ? '?' : kk.toUpperCase();
+    var icEl=el.querySelector('.ic'); if(icEl) icEl.textContent = isEmpty ? '' : (d.icon||'');
     var dispName=(myBladeStance==='arcane' && d.nameArcane) ? d.nameArcane : d.name;
     var lbl=el.querySelector('.l'); if(lbl)lbl.textContent = isEmpty ? '???' : (dispName.length>8?dispName.slice(0,8):dispName).toUpperCase();
     var mel=el.querySelector('.m'); if(mel){ if(d.mp>0){mel.style.display='';mel.textContent=d.mp;} else mel.style.display='none'; }
@@ -1604,9 +1636,8 @@ function frame(now){
   ctx.strokeStyle='#000';ctx.lineWidth=6;ctx.strokeRect(0,0,zd.w,zd.h);
 
   var decor=ZONE_DECOR[myZone];
-  if(decor){ for(var di=0;di<decor.length;di++){ var dd=decor[di];
-    if(dd.t==='tree') drawPixelGrid(TREE_GRID,TREE_COL,dd.x,dd.y,6.5);
-    else drawPixelGrid(ROCK_GRID,ROCK_COL,dd.x,dd.y,6.5); } }
+  if(decor){ for(var di=0;di<decor.length;di++){ var dd=decor[di]; var dt=DECOR_TYPES[dd.t];
+    if(dt) drawPixelGrid(dt.grid,dt.col,dd.x,dd.y,6.5); } }
 
   var pts=(zd.portals||[]);
   for(var pi=0;pi<pts.length;pi++){var pt=pts[pi];var pulse=6*Math.sin(performance.now()/260+pi);
@@ -2231,7 +2262,7 @@ const crypto = require('crypto');
 const SAVE_FIELDS = ['charDisplayName','cls','lv','xp','xpNext','gold','stones','STR','VIT','AGI','INT','statPts','skillPts',
   'skRank','loadout','inv','equip','zone','x','y','qk','qc','dailyDate','checkinStreak','checkedToday',
   'npcAccepted','npcClaimed','cum','dungeonEntries','dungeonDate','mounts','mounted','pet','guild','pkScore',
-  'gemCount','baseMaxhp'];
+  'gemCount','baseMaxhp','baseMaxmp'];
 function hashPass(pass,salt){ return crypto.scryptSync(pass,salt,64).toString('hex'); }
 async function dbInit(){
   if(!dbPool)return console.log('⚠️ Chưa có DATABASE_URL — chạy KHÔNG LƯU TRỮ (dữ liệu mất khi restart, chỉ dùng để test tạm).');
@@ -2405,6 +2436,7 @@ wss.on('connection',(ws)=>{
         if(saved && saved.cls && CLASSES[saved.cls]){
           const c=CLASSES[saved.cls];
           Object.assign(p,saved);
+          if(!p.baseMaxmp) p.baseMaxmp=c.mp; // tự vá nhân vật đã lỡ lưu thiếu field này trước bản sửa lỗi mana
           p.chosen=true; p.hue=c.hue; p.spd=c.spd;
           p.basicType=c.basic.type; p.basicRange=c.basic.range; p.basicDmg=c.basic.dmg; p.basicCd=c.basic.cd;
           p.basicSpd=c.basic.spd||0; p.basicR=c.basic.r||6; p.basicKind=c.basic.kind||'melee';
@@ -4268,4 +4300,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v2.00 (sửa gốc zoom camera + đặt tên nhân vật) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v2.20 (địa hình 12 loại riêng theo 3 vùng) chạy ở cổng '+PORT));
