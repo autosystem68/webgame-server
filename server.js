@@ -609,7 +609,9 @@ const CLIENT = `<!doctype html>
     <div id="slotCards" style="display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;justify-content:center"></div>
   </div>
   <div id="pick" style="display:none">
-    <h2>Chọn Class</h2><p>Mỗi class một lối chơi — chọn để vào trận</p>
+    <h2>Chọn Class</h2>
+    <input id="charNameInput" maxlength="16" placeholder="Đặt tên nhân vật..." style="font-size:16px;padding:8px 12px;border-radius:8px;border:2px solid #a87b3e;background:#171009;color:#e0b062;text-align:center;width:220px;margin-bottom:10px">
+    <p>Mỗi class một lối chơi — chọn để vào trận</p>
     <div class="pc" id="pcards"></div>
   </div>
   <canvas id="c"></canvas>
@@ -633,10 +635,10 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.90 · bắt đầu địa hình — cây/đá rải trong 3 vùng</div>
+  <div id="ver">v2.00 · sửa gốc zoom camera + đặt tên nhân vật thật</div>
 </div>
 <script>
-var WW=800, WH=600;
+var WW=560, WH=420;
 var cv=document.getElementById('c'), ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
 var CHAR_GRID=['....ooo......','...ohhho.....','..ohhhhho....','.ohhhhhhho...','.ohsesseho...','..osssso.....',
   '...ooo.......','..obBBBbo....','.oaBBBBBao...','.oaBBBBBao...','.oaBBBBBao...','..obBBBbo....','...obbbo.....','..oll..llo...','..oll..llo...',
@@ -1262,7 +1264,10 @@ function renderSlots(slots){
     var el=document.createElement('div');el.className='pcard';
     el.innerHTML='<div class="ic">'+CLS[c].n.split(' ')[0]+'</div><div class="cn">'+CLS[c].n.replace(/^\S+\s/,'')+'</div><div class="cd2">'+CLS[c].d+'</div>';
     el.addEventListener('pointerdown',function(ev){ev.preventDefault();
-      if(ws.readyState===1)ws.send(JSON.stringify({t:'pick',c:c}));
+      var cName=(document.getElementById('charNameInput').value||'').trim();
+      if(!cName){ document.getElementById('charNameInput').style.borderColor='#ff4a4a'; document.getElementById('charNameInput').focus(); return; }
+      if(ws.readyState===1)ws.send(JSON.stringify({t:'pick',c:c,name:cName}));
+      document.getElementById('me').textContent=cName;
       chosen=true; document.getElementById('pick').style.display='none';
       setTimeout(function(){ if(!lastSkillMeta){ chosen=false; document.getElementById('pick').style.display='flex'; } },4000);
     });
@@ -1293,7 +1298,7 @@ ws.onmessage=function(e){
   else if(m.t==='slotresult'){
     if(!m.ok)return;
     document.getElementById('slotScr').style.display='none';
-    if(m.returning){ chosen=true; }
+    if(m.returning){ chosen=true; if(m.name)document.getElementById('me').textContent=m.name; }
     else { document.getElementById('pick').style.display='flex'; }
   }
   else if(m.t==='zones'){ ZONEDATA=m.zones||{}; }
@@ -1922,12 +1927,13 @@ function frame(now){
     else { ctx.fillStyle='hsl('+mhue+',55%,42%)';ctx.fillRect(Math.round(en.x-er*0.8),Math.round(en.y-er*0.8),Math.round(er*1.6),Math.round(er*1.6)); }
     if(en.rooted){ ctx.globalAlpha=0.4; ctx.fillStyle='#8a4a2a'; ctx.beginPath(); ctx.arc(en.x,en.y,er,0,7); ctx.fill(); ctx.globalAlpha=1; }
     else if(en.slowed){ ctx.globalAlpha=0.35; ctx.fillStyle='#5ab0e0'; ctx.beginPath(); ctx.arc(en.x,en.y,er,0,7); ctx.fill(); ctx.globalAlpha=1; }
-    var bw=en.boss?110:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-er-10,bw,en.boss?6:4);
-    ctx.fillStyle=en.boss?'#e07ab8':'#d06a55';ctx.fillRect(en.x-bw/2,en.y-er-10,bw*Math.max(0,en.hp)/en.maxhp,en.boss?6:4);
-    if(en.boss){ctx.fillStyle='#ffb0e0';ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillText('BOSS',en.x,en.y-er-16);}
-    else if(en.mname){ctx.fillStyle='#c9b896';ctx.font='10px Trebuchet MS';ctx.textAlign='center';ctx.fillText(en.mname,en.x,en.y-er-14);}
+    var visH=en.boss?(er*2.6):(er*1.6);
+    var bw=en.boss?110:30;ctx.fillStyle='#000a';ctx.fillRect(en.x-bw/2,en.y-visH-10,bw,en.boss?6:4);
+    ctx.fillStyle=en.boss?'#e07ab8':'#d06a55';ctx.fillRect(en.x-bw/2,en.y-visH-10,bw*Math.max(0,en.hp)/en.maxhp,en.boss?6:4);
+    if(en.boss){ctx.fillStyle='#ffb0e0';ctx.font='bold 12px Trebuchet MS';ctx.textAlign='center';ctx.fillText('BOSS',en.x,en.y-visH-16);}
+    else if(en.mname){ctx.fillStyle='#c9b896';ctx.font='10px Trebuchet MS';ctx.textAlign='center';ctx.fillText(en.mname,en.x,en.y-visH-14);}
     var stIc=''; if(en.wound>0)stIc+='🩸'; if(en.shred)stIc+='💢'; if(en.weak)stIc+='📢'; if(en.marked)stIc+='🎯'; if(en.arcmarked)stIc+='🔮'; if(en.ravenmarked)stIc+='🐦'; if(en.bladefrost)stIc+='🧊'; if(en.rooted)stIc+='⛓️'; else if(en.slowed)stIc+='❄️';
-    if(stIc){ ctx.font='11px serif';ctx.textAlign='center';ctx.fillText(stIc,en.x,en.y-er-(en.boss?24:16)); }}
+    if(stIc){ ctx.font='11px serif';ctx.textAlign='center';ctx.fillText(stIc,en.x,en.y-visH-(en.boss?24:16)); }}
 
   for(var li=0;li<loot.length;li++){var it=loot[li]; if(it.zone!==myZone)continue;
     var col=it.tier>=3?'#c77dff':(it.tier>=2?'#6bd0ff':'#9fe0a0');
@@ -2043,11 +2049,11 @@ function frame(now){
       ctx.beginPath();ctx.arc(rx,ry,17+bsPulse*1.5,0,7);ctx.stroke();
       ctx.restore();
     }
-    ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-28,32,4);
-    ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-28,32*Math.max(0,p.hp)/p.maxhp,4);
-    ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText('#'+id+(p.pk>=50?' ☠️':''),rx,ry-32);
+    ctx.fillStyle='#000a';ctx.fillRect(rx-16,ry-46,32,4);
+    ctx.fillStyle='#6fce6a';ctx.fillRect(rx-16,ry-46,32*Math.max(0,p.hp)/p.maxhp,4);
+    ctx.fillStyle=(p.pk>=50)?'#ff4a4a':'#e8d8b8';ctx.font='11px Trebuchet MS';ctx.textAlign='center';ctx.fillText((p.name||('#'+id))+(p.pk>=50?' ☠️':''),rx,ry-50);
     var pStIc=''; if(p.wound>0)pStIc+='🩸'; if(p.shred)pStIc+='💢'; if(p.counter)pStIc+='🛡️'; if(p.warcryBuf)pStIc+='📯'; if(p.frenzy)pStIc+='🔥'; if(p.marked)pStIc+='🎯'; if(p.arcmarked)pStIc+='🔮'; if(p.ravenmarked)pStIc+='🐦'; if(p.bladefrost)pStIc+='🧊'; if(p.spellBladeArmed)pStIc+='✨'; if(p.resonanceActive)pStIc+='🌗'; if(p.dualityActive)pStIc+='☯️'+(p.dualityStacks||0); if(p.decreeBuf)pStIc+='📣'; if(p.decreeDebuf)pStIc+='😨'; if(p.sacrificeBuf)pStIc+='💔'; if(p.soulBuf)pStIc+='📖'; if(p.willActive)pStIc+='👑'; if(p.windguard)pStIc+='🍃'; if(p.wildhunt)pStIc+='🐾'; if(p.rooted)pStIc+='⛓️'; else if(p.slowed)pStIc+='❄️';
-    if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-44); }
+    if(pStIc){ ctx.font='11px serif'; ctx.fillText(pStIc,rx,ry-62); }
     ctx.globalAlpha=1;
   }
 
@@ -2222,7 +2228,7 @@ wss.on('error', (err) => { console.error('⚠️ Lỗi WebSocketServer (đã ch�
 // ==================== LƯU TRỮ THẬT (Postgres/Supabase qua DATABASE_URL) ====================
 // Tài khoản (username+password) → tối đa 3 ô nhân vật/tài khoản, đúng chuẩn MMORPG thật.
 const crypto = require('crypto');
-const SAVE_FIELDS = ['cls','lv','xp','xpNext','gold','stones','STR','VIT','AGI','INT','statPts','skillPts',
+const SAVE_FIELDS = ['charDisplayName','cls','lv','xp','xpNext','gold','stones','STR','VIT','AGI','INT','statPts','skillPts',
   'skRank','loadout','inv','equip','zone','x','y','qk','qc','dailyDate','checkinStreak','checkedToday',
   'npcAccepted','npcClaimed','cum','dungeonEntries','dungeonDate','mounts','mounted','pet','guild','pkScore',
   'gemCount','baseMaxhp'];
@@ -2406,7 +2412,7 @@ wss.on('connection',(ws)=>{
           sendInv(p,id); sendTo(id,{t:'skills',meta:skillMeta(p),passive:PASSIVES[p.cls],full:fullSkillList(p),loadout:p.loadout}); sendQuests(p,id); sendGuildData(id);
           sendTo(id,{t:'mounts',owned:p.mounts,mounted:p.mounted});
           ensureDungeon(p); sendTo(id,{t:'dungeon',entries:p.dungeonEntries,max:DUNGEON_MAX_ENTRIES});
-          sendTo(id,{t:'slotresult',ok:true,returning:true});
+          sendTo(id,{t:'slotresult',ok:true,returning:true,name:p.charDisplayName});
           console.log('👤 "'+p.charUser+'" ô '+slot+' — khôi phục nhân vật '+saved.cls+' Lv'+(saved.lv||1));
         } else {
           sendTo(id,{t:'slotresult',ok:true,returning:false});
@@ -2417,6 +2423,7 @@ wss.on('connection',(ws)=>{
     if(m.t==='pick'){
       const c=CLASSES[m.c]; if(!c||p.chosen)return;
       try{
+        p.charDisplayName=(''+(m.name||'')).trim().slice(0,16)||('#'+id);
         p.cls=m.c; p.chosen=true; p.hue=c.hue; p.spd=c.spd;
         p.baseMaxhp=c.hp; p.baseMaxmp=c.mp; p.gearAtk=0; p.gearHp=0; p.inv=[]; p.equip=emptyEquip();
         p.maxhp=c.hp; p.hp=c.hp; p.maxmp=c.mp; p.mp=c.mp;
@@ -4218,7 +4225,7 @@ setInterval(()=>{
   }
   const psPublic={}; for(const id in players){const p=players[id];if(!p.chosen)continue;
     try{
-      psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,bladeStance:p.bladeStance||'blade',jumpT:r2(p.jumpT||0),jumpScale:r2(p.jumpScale||1),levitateT:r2(p.levitateT||0),braceT:r2(p.braceT||0),
+      psPublic[id]={x:r1(p.x),y:r1(p.y),fx:r2(p.fx),fy:r2(p.fy),hp:r1(p.hp),maxhp:p.maxhp,mp:r1(p.mp),maxmp:p.maxmp,hue:p.hue,dead:p.dead,lv:p.lv,cls:p.cls,zone:p.zone,name:p.charDisplayName||('#'+id),bladeStance:p.bladeStance||'blade',jumpT:r2(p.jumpT||0),jumpScale:r2(p.jumpScale||1),levitateT:r2(p.levitateT||0),braceT:r2(p.braceT||0),
         spd:r1((p.spd+(p.AGI||0)*2)*((p.buffT>0)?p.buffSpdMul:1)*mountSpdMul(p)*((p.cls==='blade'&&getStance(p)==='arcane')?1.15:1)),bcd:Math.max(0.15,p.basicCd-(p.AGI||0)*0.01),sh:(p.shieldHP>0),mt:p.mounted,pk:Math.round(p.pkScore||0),
         wound:statusStacks(p,'wound'),shred:!!getStatus(p,'shred'),counter:(p.counterT>0),warcryBuf:(p.warcryDefT>0),frenzy:(p.cls==='war'&&(p.fervor||0)>=80),marked:!!getStatus(p,'huntmark'),arcmarked:!!getStatus(p,'arcmark'),ravenmarked:!!getStatus(p,'ravenmark'),bladefrost:!!getStatus(p,'bladefrost'),spellBladeArmed:(p.spellBladeT>0),resonanceActive:(p.resonanceT>0),dualityActive:(p.dualityT>0),dualityStacks:(p.dualityStacks||0),windguard:(p.windguardT>0),wildhunt:(p.wildHuntT>0),decreeBuf:(p.decreeBuffT>0),decreeDebuf:(p.decreeDebuffT>0),sacrificeBuf:(p.sacrificeAtkBufT>0),soulBuf:(p.soulBufT>0),willActive:(p.commandStateT>0),
         slowed:(p.slowT>0&&(p.slowMul||1)>=0.15),rooted:(p.slowT>0&&(p.slowMul||1)<0.15)};
@@ -4261,4 +4268,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.90 (bắt đầu địa hình: cây/đá) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v2.00 (sửa gốc zoom camera + đặt tên nhân vật) chạy ở cổng '+PORT));
