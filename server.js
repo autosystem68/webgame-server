@@ -633,17 +633,18 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.40 · chuyển hẳn sang pixel art thật (khối vuông)</div>
+  <div id="ver">v1.41 · lưới pixel 9x13 chi tiết hơn (mắt/tóc/tay riêng)</div>
 </div>
 <script>
 var WW=800, WH=600;
 var cv=document.getElementById('c'), ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
-var CHAR_GRID=['.111.','11211','.222.','33333','33333','33333','33333','55.55','55.55'];
+var CHAR_GRID=['..ooo....','.ohhho...','ohhhhhho.','ohsesho..','.ossso...','..ooo....',
+  '.obBBbo..','oaBBBBao.','oaBBBBao.','.obBBbo..','..obbo...','.ol..lo..','.oll.llo.'];
 function drawPixelChar(px,py,hue,cls,fx,fy){
-  var PS=3.2, w=CHAR_GRID[0].length, h=CHAR_GRID.length;
+  var PS=2.0, w=CHAR_GRID[0].length, h=CHAR_GRID.length;
   var sx=px-(w*PS)/2, sy=py-(h*PS)/2-4;
-  var bodyCol='hsl('+hue+',60%,48%)', darkCol='hsl('+hue+',60%,26%)';
-  var colors={'1':'#3a2a1a','2':'#e0b088','3':bodyCol,'5':darkCol};
+  var bodyCol='hsl('+hue+',55%,45%)', hiCol='hsl('+hue+',60%,58%)', armCol='hsl('+hue+',50%,32%)';
+  var colors={'o':'#150e07','h':'#3a2a1a','s':'#e0b088','e':'#150e07','b':bodyCol,'B':hiCol,'a':armCol,'l':'#231810'};
   for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ var ch=CHAR_GRID[r][c]; if(ch==='.')continue;
     ctx.fillStyle=colors[ch]; ctx.fillRect(Math.round(sx+c*PS),Math.round(sy+r*PS),Math.ceil(PS),Math.ceil(PS)); } }
   var wx=px+fx*13, wy=py+fy*13;
@@ -4205,4 +4206,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.40 (chuyển sang pixel art thật) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.41 (lưới pixel 9x13 chi tiết hơn) chạy ở cổng '+PORT));
