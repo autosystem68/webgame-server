@@ -637,7 +637,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="ic"></span><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v2.20 · địa hình 12 loại riêng theo 3 vùng (Rừng/Băng/Mật Thất)</div>
+  <div id="ver">v2.22 · viền đen cho quái (theo tham khảo ảnh mẫu)</div>
 </div>
 <script>
 var WW=560, WH=420;
@@ -726,7 +726,6 @@ var ZONE_DECOR={
     {t:'drock',x:480,y:600},{t:'drock',x:1150,y:250},{t:'drock',x:1200,y:700},{t:'drock',x:950,y:850},
     {t:'drock',x:350,y:850},{t:'rubble',x:300,y:300},{t:'rubble',x:900,y:400},{t:'rubble',x:600,y:800},
     {t:'bones',x:1050,y:180},{t:'bones',x:400,y:450}]
-};
 };
 function resize(){
   scr.dpr=Math.min(devicePixelRatio||1,2);
@@ -1937,7 +1936,10 @@ function frame(now){
     var g=MOB_GRIDS[shape]||MOB_GRIDS.brute; var w=g[0].length;
     var ps=(er*3.0)/w; var col={'o':'hsl('+hue+',60%,28%)'};
     var bobY=Math.abs(Math.sin(performance.now()/480+cx*0.4))*1.4;
-    drawPixelGrid(g,col,cx,cy-bobY,ps);
+    var oy=cy-bobY, outCol={'o':'#0a0806'};
+    drawPixelGrid(g,outCol,cx-ps*0.9,oy,ps);drawPixelGrid(g,outCol,cx+ps*0.9,oy,ps);
+    drawPixelGrid(g,outCol,cx,oy-ps*0.9,ps);drawPixelGrid(g,outCol,cx,oy+ps*0.9,ps);
+    drawPixelGrid(g,col,cx,oy,ps);
     var eyeY=cy-bobY-er*0.45, eyeGap=er*0.28;
     var eyePulse=(Math.sin(performance.now()/220+cx)+1)/2;
     ctx.save();ctx.globalAlpha=0.75+eyePulse*0.25;ctx.fillStyle='#ff3020';
@@ -4300,4 +4302,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v2.20 (địa hình 12 loại riêng theo 3 vùng) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v2.22 (viền đen cho quái) chạy ở cổng '+PORT));
