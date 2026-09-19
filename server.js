@@ -633,7 +633,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.60 · quái đúng hình dạng thật + Boss pixel riêng</div>
+  <div id="ver">v1.70 · sửa vũ khí phản cảm + mắt đỏ + lật hướng/nhún</div>
 </div>
 <script>
 var WW=800, WH=600;
@@ -645,16 +645,35 @@ function drawPixelGrid(grid,colorMap,px,py,ps){
   for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ var ch=grid[r][c]; if(ch==='.'||!colorMap[ch])continue;
     ctx.fillStyle=colorMap[ch]; ctx.fillRect(Math.round(sx+c*ps),Math.round(sy+r*ps),Math.ceil(ps),Math.ceil(ps)); } }
 }
-function drawPixelChar(px,py,hue,cls,fx,fy){
-  var PS=3.2;
+function drawPixelChar(px,py,hue,cls,fx,fy,moving){
+  var PS=3.7;
   var bodyCol='hsl('+hue+',55%,45%)', hiCol='hsl('+hue+',60%,58%)', armCol='hsl('+hue+',50%,32%)';
   var colors={'o':'#150e07','h':'#3a2a1a','s':'#e0b088','e':'#150e07','b':bodyCol,'B':hiCol,'a':armCol,'l':'#231810'};
-  drawPixelGrid(CHAR_GRID,colors,px,py-6,PS);
-  var wx=px+fx*17, wy=py+fy*17;
-  if(cls==='war'){ ctx.fillStyle='#c8c8d0'; ctx.fillRect(Math.round(wx-4),Math.round(wy-12),8,22); ctx.fillStyle='#6a4a2a'; ctx.fillRect(Math.round(wx-3),Math.round(wy+8),6,7); }
-  else if(cls==='mage'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-2),Math.round(wy-13),4,26); ctx.fillStyle='#c9a8ff'; ctx.fillRect(Math.round(wx-4),Math.round(wy-18),8,8); }
-  else if(cls==='arc'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-2.5),Math.round(wy-12),5,24); }
-  else if(cls==='cmd'){ ctx.fillStyle='#d9a04a'; ctx.fillRect(Math.round(px-19),Math.round(py-11),7,7); ctx.fillRect(Math.round(px+12),Math.round(py-11),7,7);
+  var bobT=performance.now()/(moving?140:520)+px*0.3;
+  var bobY=Math.abs(Math.sin(bobT))*(moving?2.2:0.8);
+  var flip=(fx<-0.15)?-1:1;
+  ctx.save(); ctx.translate(px,0); ctx.scale(flip,1); ctx.translate(-px,0);
+  drawPixelGrid(CHAR_GRID,colors,px,py-6-bobY,PS);
+  ctx.restore();
+  var ang=Math.atan2(fy,fx), perpX=-fy, perpY=fx;
+  var holdX=px+perpX*10+fx*3, holdY=py+perpY*10+fy*3-4;
+  if(cls==='war'){
+    ctx.save();ctx.translate(holdX,holdY);ctx.rotate(ang);
+    ctx.fillStyle='#6a4a2a';ctx.fillRect(-7,-2.5,7,5);
+    ctx.fillStyle='#8a8a98';ctx.fillRect(0,-6,4,12);
+    ctx.fillStyle='#d8d8e0';ctx.fillRect(3,-2.5,19,5);
+    ctx.restore();
+  } else if(cls==='mage'){
+    ctx.save();ctx.translate(holdX,holdY);ctx.rotate(ang);
+    ctx.fillStyle='#7a5a2a';ctx.fillRect(-3,-2,24,4);
+    ctx.fillStyle='#c9a8ff';ctx.fillRect(19,-4,8,8);
+    ctx.restore();
+  } else if(cls==='arc'){
+    ctx.save();ctx.translate(holdX,holdY);ctx.rotate(ang+1.5708);
+    ctx.fillStyle='#7a5a2a';ctx.fillRect(-2,-11,4,22);
+    ctx.strokeStyle='#c9b090';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-11);ctx.lineTo(6,0);ctx.lineTo(0,11);ctx.stroke();
+    ctx.restore();
+  } else if(cls==='cmd'){ ctx.fillStyle='#d9a04a'; ctx.fillRect(Math.round(px-19),Math.round(py-11),7,7); ctx.fillRect(Math.round(px+12),Math.round(py-11),7,7);
     ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2.5),Math.round(py-36),4,13); ctx.fillRect(Math.round(px+1.5),Math.round(py-33),10,8); }
 }
 var scr={w:0,h:0,scale:1,ox:0,oy:0,dpr:1};
@@ -1857,8 +1876,15 @@ function frame(now){
   };
   function drawMobPixel(cx,cy,er,hue,shape){
     var g=MOB_GRIDS[shape]||MOB_GRIDS.brute; var w=g[0].length;
-    var ps=(er*2.3)/w; var col={'o':'hsl('+hue+',55%,42%)'};
-    drawPixelGrid(g,col,cx,cy,ps);
+    var ps=(er*3.0)/w; var col={'o':'hsl('+hue+',60%,28%)'};
+    var bobY=Math.abs(Math.sin(performance.now()/480+cx*0.4))*1.4;
+    drawPixelGrid(g,col,cx,cy-bobY,ps);
+    var eyeY=cy-bobY-er*0.45, eyeGap=er*0.28;
+    var eyePulse=(Math.sin(performance.now()/220+cx)+1)/2;
+    ctx.save();ctx.globalAlpha=0.75+eyePulse*0.25;ctx.fillStyle='#ff3020';
+    ctx.fillRect(Math.round(cx-eyeGap-1.5),Math.round(eyeY),3,3);
+    ctx.fillRect(Math.round(cx+eyeGap-1.5),Math.round(eyeY),3,3);
+    ctx.restore();
   }
   for(var eid in enemies){var en=enemies[eid];if(en.dead||en.zone!==myZone)continue;var er=en.r||14;
     var mhue=en.boss?330:(en.mhue!==undefined?en.mhue:5);
@@ -1975,7 +2001,8 @@ function frame(now){
     var bodyR=15;
     ctx.globalAlpha=p.dead?0.25:1;
     var bfa=Math.atan2(ffy,ffx);
-    drawPixelChar(rx,ry,p.hue,p.cls,ffx,ffy);
+    drawPixelChar(rx,ry,p.hue,p.cls,ffx,ffy,(p._prx!==undefined&&(Math.abs(rx-p._prx)>0.15||Math.abs(ry-p._pry)>0.15)));
+    p._prx=rx; p._pry=ry;
     if(p.cls==='blade' && !p.dead){ ctx.save();ctx.font='13px serif';ctx.textAlign='center';
       ctx.fillText(p.bladeStance==='arcane'?'🔮':'🗡️',rx+ffx*17,ry+ffy*17+4); ctx.restore(); }
     if(p.rooted){ ctx.globalAlpha=0.4; ctx.fillStyle='#8a4a2a'; ctx.beginPath(); ctx.arc(rx,ry,bodyR,0,7); ctx.fill(); ctx.globalAlpha=p.dead?0.25:1; }
@@ -4213,4 +4240,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.60 (quái đúng hình dạng + Boss pixel riêng) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.70 (sửa vũ khí + mắt đỏ + lật hướng/nhún) chạy ở cổng '+PORT));
