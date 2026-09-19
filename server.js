@@ -633,20 +633,21 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.70 · sửa vũ khí phản cảm + mắt đỏ + lật hướng/nhún</div>
+  <div id="ver">v1.90 · bắt đầu địa hình — cây/đá rải trong 3 vùng</div>
 </div>
 <script>
 var WW=800, WH=600;
 var cv=document.getElementById('c'), ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
-var CHAR_GRID=['...ooo.....','..ohhho....','.ohhhhho...','ohhhhhhho..','ohsesseho..','.osssso....',
-  '..ooo......','.obBBBbo...','oaBBBBBao..','oaBBBBBao..','oaBBBBBao..','.obBBBbo...','..obbbo....','.oll..llo..','.oll..llo..'];
+var CHAR_GRID=['....ooo......','...ohhho.....','..ohhhhho....','.ohhhhhhho...','.ohsesseho...','..osssso.....',
+  '...ooo.......','..obBBBbo....','.oaBBBBBao...','.oaBBBBBao...','.oaBBBBBao...','..obBBBbo....','...obbbo.....','..oll..llo...','..oll..llo...',
+  '..llll.llll..','..llll.llll..'];
 function drawPixelGrid(grid,colorMap,px,py,ps){
   var w=grid[0].length, h=grid.length, sx=px-(w*ps)/2, sy=py-(h*ps)/2;
   for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ var ch=grid[r][c]; if(ch==='.'||!colorMap[ch])continue;
     ctx.fillStyle=colorMap[ch]; ctx.fillRect(Math.round(sx+c*ps),Math.round(sy+r*ps),Math.ceil(ps),Math.ceil(ps)); } }
 }
 function drawPixelChar(px,py,hue,cls,fx,fy,moving){
-  var PS=3.7;
+  var PS=3.9;
   var bodyCol='hsl('+hue+',55%,45%)', hiCol='hsl('+hue+',60%,58%)', armCol='hsl('+hue+',50%,32%)';
   var colors={'o':'#150e07','h':'#3a2a1a','s':'#e0b088','e':'#150e07','b':bodyCol,'B':hiCol,'a':armCol,'l':'#231810'};
   var bobT=performance.now()/(moving?140:520)+px*0.3;
@@ -677,6 +678,23 @@ function drawPixelChar(px,py,hue,cls,fx,fy,moving){
     ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2.5),Math.round(py-36),4,13); ctx.fillRect(Math.round(px+1.5),Math.round(py-33),10,8); }
 }
 var scr={w:0,h:0,scale:1,ox:0,oy:0,dpr:1};
+var TREE_GRID=['..ggg..','.ggggg.','ggggggg','.ggggg.','...t...','...t...','...t...'];
+var ROCK_GRID=['..rrr..','.rrrrr.','rrrrrrr','rrrrrrr','.rrrrr.'];
+var TREE_COL={'g':'#2a4a1e','t':'#4a3018'};
+var ROCK_COL={'r':'#4a4842'};
+var ZONE_DECOR={
+  forest:[{t:'tree',x:150,y:150},{t:'tree',x:680,y:120},{t:'tree',x:120,y:520},{t:'tree',x:770,y:480},
+    {t:'tree',x:400,y:90},{t:'tree',x:820,y:280},{t:'rock',x:250,y:350},{t:'rock',x:600,y:600},
+    {t:'tree',x:1100,y:180},{t:'tree',x:1380,y:400},{t:'tree',x:1200,y:750},{t:'tree',x:950,y:950},
+    {t:'rock',x:1050,y:550},{t:'rock',x:1420,y:850},{t:'tree',x:300,y:900},{t:'tree',x:1300,y:120}],
+  cave:[{t:'rock',x:120,y:130},{t:'rock',x:750,y:150},{t:'rock',x:200,y:550},{t:'rock',x:700,y:520},
+    {t:'rock',x:450,y:100},{t:'rock',x:850,y:350},{t:'tree',x:100,y:350},
+    {t:'rock',x:1150,y:200},{t:'rock',x:1400,y:500},{t:'rock',x:1250,y:800},{t:'rock',x:1000,y:950},
+    {t:'rock',x:1450,y:900},{t:'rock',x:550,y:900}],
+  dungeon:[{t:'rock',x:130,y:120},{t:'rock',x:820,y:140},{t:'rock',x:180,y:500},{t:'rock',x:780,y:480},
+    {t:'rock',x:480,y:600},{t:'rock',x:1150,y:250},{t:'rock',x:1200,y:700},{t:'rock',x:950,y:850},
+    {t:'rock',x:350,y:850}]
+};
 function resize(){
   scr.dpr=Math.min(devicePixelRatio||1,2);
   var r=cv.getBoundingClientRect(); scr.w=r.width; scr.h=r.height;
@@ -1580,6 +1598,11 @@ function frame(now){
   ctx.globalAlpha=1;
   ctx.strokeStyle='#000';ctx.lineWidth=6;ctx.strokeRect(0,0,zd.w,zd.h);
 
+  var decor=ZONE_DECOR[myZone];
+  if(decor){ for(var di=0;di<decor.length;di++){ var dd=decor[di];
+    if(dd.t==='tree') drawPixelGrid(TREE_GRID,TREE_COL,dd.x,dd.y,6.5);
+    else drawPixelGrid(ROCK_GRID,ROCK_COL,dd.x,dd.y,6.5); } }
+
   var pts=(zd.portals||[]);
   for(var pi=0;pi<pts.length;pi++){var pt=pts[pi];var pulse=6*Math.sin(performance.now()/260+pi);
     ctx.save();ctx.globalAlpha=.85;ctx.strokeStyle='#ffd76b';ctx.lineWidth=3;ctx.shadowColor='#ffd76b';ctx.shadowBlur=16;
@@ -2007,8 +2030,6 @@ function frame(now){
       ctx.fillText(p.bladeStance==='arcane'?'🔮':'🗡️',rx+ffx*17,ry+ffy*17+4); ctx.restore(); }
     if(p.rooted){ ctx.globalAlpha=0.4; ctx.fillStyle='#8a4a2a'; ctx.beginPath(); ctx.arc(rx,ry,bodyR,0,7); ctx.fill(); ctx.globalAlpha=p.dead?0.25:1; }
     else if(p.slowed){ ctx.globalAlpha=0.35; ctx.fillStyle='#5ab0e0'; ctx.beginPath(); ctx.arc(rx,ry,bodyR,0,7); ctx.fill(); ctx.globalAlpha=p.dead?0.25:1; }
-    if(!p.dead){ctx.strokeStyle='#ffe0a0';ctx.lineWidth=3;ctx.beginPath();
-      ctx.moveTo(rx,ry);ctx.lineTo(rx+ffx*22,ry+ffy*22);ctx.stroke();}
     
     if(p.sh){ctx.strokeStyle='#6bc4ff';ctx.lineWidth=2;ctx.globalAlpha=0.85;ctx.beginPath();ctx.arc(rx,ry,19,0,7);ctx.stroke();ctx.globalAlpha=p.dead?0.25:1;}
     if(p.mt){ctx.save();ctx.globalAlpha=0.55;ctx.fillStyle='#5a3a1a';ctx.beginPath();ctx.ellipse(rx,ry+16,20,9,0,0,7);ctx.fill();ctx.restore();}
@@ -4240,4 +4261,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.70 (sửa vũ khí + mắt đỏ + lật hướng/nhún) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.90 (bắt đầu địa hình: cây/đá) chạy ở cổng '+PORT));
