@@ -633,26 +633,29 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v1.41 · lưới pixel 9x13 chi tiết hơn (mắt/tóc/tay riêng)</div>
+  <div id="ver">v1.50 · to hơn rõ chân/vũ khí + quái nhận diện được</div>
 </div>
 <script>
 var WW=800, WH=600;
 var cv=document.getElementById('c'), ctx=cv.getContext('2d'); ctx.imageSmoothingEnabled=false;
-var CHAR_GRID=['..ooo....','.ohhho...','ohhhhhho.','ohsesho..','.ossso...','..ooo....',
-  '.obBBbo..','oaBBBBao.','oaBBBBao.','.obBBbo..','..obbo...','.ol..lo..','.oll.llo.'];
+var CHAR_GRID=['...ooo.....','..ohhho....','.ohhhhho...','ohhhhhhho..','ohsesseho..','.osssso....',
+  '..ooo......','.obBBBbo...','oaBBBBBao..','oaBBBBBao..','oaBBBBBao..','.obBBBbo...','..obbbo....','.oll..llo..','.oll..llo..'];
+function drawPixelGrid(grid,colorMap,px,py,ps){
+  var w=grid[0].length, h=grid.length, sx=px-(w*ps)/2, sy=py-(h*ps)/2;
+  for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ var ch=grid[r][c]; if(ch==='.'||!colorMap[ch])continue;
+    ctx.fillStyle=colorMap[ch]; ctx.fillRect(Math.round(sx+c*ps),Math.round(sy+r*ps),Math.ceil(ps),Math.ceil(ps)); } }
+}
 function drawPixelChar(px,py,hue,cls,fx,fy){
-  var PS=2.0, w=CHAR_GRID[0].length, h=CHAR_GRID.length;
-  var sx=px-(w*PS)/2, sy=py-(h*PS)/2-4;
+  var PS=3.2;
   var bodyCol='hsl('+hue+',55%,45%)', hiCol='hsl('+hue+',60%,58%)', armCol='hsl('+hue+',50%,32%)';
   var colors={'o':'#150e07','h':'#3a2a1a','s':'#e0b088','e':'#150e07','b':bodyCol,'B':hiCol,'a':armCol,'l':'#231810'};
-  for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ var ch=CHAR_GRID[r][c]; if(ch==='.')continue;
-    ctx.fillStyle=colors[ch]; ctx.fillRect(Math.round(sx+c*PS),Math.round(sy+r*PS),Math.ceil(PS),Math.ceil(PS)); } }
-  var wx=px+fx*13, wy=py+fy*13;
-  if(cls==='war'){ ctx.fillStyle='#c8c8d0'; ctx.fillRect(Math.round(wx-3),Math.round(wy-9),6,17); ctx.fillStyle='#6a4a2a'; ctx.fillRect(Math.round(wx-2),Math.round(wy+6),4,5); }
-  else if(cls==='mage'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-1.5),Math.round(wy-10),3,20); ctx.fillStyle='#c9a8ff'; ctx.fillRect(Math.round(wx-3),Math.round(wy-14),6,6); }
-  else if(cls==='arc'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-2),Math.round(wy-9),4,18); }
-  else if(cls==='cmd'){ ctx.fillStyle='#d9a04a'; ctx.fillRect(Math.round(px-15),Math.round(py-4),5,5); ctx.fillRect(Math.round(px+10),Math.round(py-4),5,5);
-    ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2),Math.round(py-27),3,10); ctx.fillRect(Math.round(px+1),Math.round(py-25),8,6); }
+  drawPixelGrid(CHAR_GRID,colors,px,py-6,PS);
+  var wx=px+fx*17, wy=py+fy*17;
+  if(cls==='war'){ ctx.fillStyle='#c8c8d0'; ctx.fillRect(Math.round(wx-4),Math.round(wy-12),8,22); ctx.fillStyle='#6a4a2a'; ctx.fillRect(Math.round(wx-3),Math.round(wy+8),6,7); }
+  else if(cls==='mage'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-2),Math.round(wy-13),4,26); ctx.fillStyle='#c9a8ff'; ctx.fillRect(Math.round(wx-4),Math.round(wy-18),8,8); }
+  else if(cls==='arc'){ ctx.fillStyle='#7a5a2a'; ctx.fillRect(Math.round(wx-2.5),Math.round(wy-12),5,24); }
+  else if(cls==='cmd'){ ctx.fillStyle='#d9a04a'; ctx.fillRect(Math.round(px-19),Math.round(py-11),7,7); ctx.fillRect(Math.round(px+12),Math.round(py-11),7,7);
+    ctx.fillStyle='#e0b062'; ctx.fillRect(Math.round(px-2.5),Math.round(py-36),4,13); ctx.fillRect(Math.round(px+1.5),Math.round(py-33),10,8); }
 }
 var scr={w:0,h:0,scale:1,ox:0,oy:0,dpr:1};
 function resize(){
@@ -1844,19 +1847,17 @@ function frame(now){
   }
 
   var MOB_GRIDS={
-    beast:  ['.5.5.','55555','55555','5.5.5'],
-    crawler:['.5.5.','.555.','55555','5.5.5'],
-    brute:  ['55555','55555','55555','5.5.5'],
-    flyer:  ['5.5.5','55555','.555.','..5..'],
-    ghost:  ['.555.','55555','55555','5.5.5'],
-    skeleton:['.555.','55555','.555.','5.5.5']
+    beast:   ['o.....o','.ooooo.','ooooooo','ooooooo','.ooooo.','o.o.o.o','.......'],
+    crawler: ['o.....o','.o...o.','..ooo..','.ooooo.','..ooo..','.o...o.','o.....o'],
+    brute:   ['..ooo..','.ooooo.','ooooooo','ooooooo','ooooooo','o.....o','o.....o'],
+    flyer:   ['o.....o','oo...oo','ooo.ooo','.ooooo.','..ooo..','..o.o..','.......'],
+    ghost:   ['..ooo..','.ooooo.','ooooooo','ooooooo','ooooooo','o.o.o.o','o.o.o.o'],
+    skeleton:['..ooo..','.o...o.','..ooo..','o.o.o.o','.ooooo.','o.....o','o.....o']
   };
   function drawMobPixel(cx,cy,er,hue,shape){
-    var g=MOB_GRIDS[shape]||MOB_GRIDS.brute; var w=g[0].length,h=g.length;
-    var ps=(er*2.1)/w; var sx=cx-(w*ps)/2, sy=cy-(h*ps)/2;
-    ctx.fillStyle='hsl('+hue+',55%,42%)';
-    for(var r=0;r<h;r++){ for(var c=0;c<w;c++){ if(g[r][c]==='.')continue;
-      ctx.fillRect(Math.round(sx+c*ps),Math.round(sy+r*ps),Math.ceil(ps),Math.ceil(ps)); } }
+    var g=MOB_GRIDS[shape]||MOB_GRIDS.brute; var w=g[0].length;
+    var ps=(er*2.3)/w; var col={'o':'hsl('+hue+',55%,42%)'};
+    drawPixelGrid(g,col,cx,cy,ps);
   }
   for(var eid in enemies){var en=enemies[eid];if(en.dead||en.zone!==myZone)continue;var er=en.r||14;
     var mhue=en.boss?330:(en.mhue!==undefined?en.mhue:5);
@@ -4206,4 +4207,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v1.41 (lưới pixel 9x13 chi tiết hơn) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v1.50 (to hơn + quái nhận diện được) chạy ở cổng '+PORT));
