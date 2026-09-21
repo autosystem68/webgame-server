@@ -637,7 +637,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="ic"></span><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v3.08 · PAPERDOLL — nhân vật mình: thân cơ bản, mặc giáp/nón HIỆN RA</div>
+  <div id="ver">v3.09 · BOSS — giữ hang sâu (hết lòng vòng), timer dài, trâu hơn</div>
 </div>
 <script>
 var WW=560, WH=420;
@@ -2526,16 +2526,19 @@ function spawnEnemy(zone){
 }
 function spawnBoss(zone){
   const id=nextE++; const z=ZONES[zone]; const tier=z.tier||1;
-  enemies[id]={x:z.w/2,y:90,zone,hp:900*tier,maxhp:900*tier,spd:34,atk:0,dead:false,respawnT:0,xp:400*tier,gold:120*tier,r:34,boss:true,dmg:22*tier};
+  let lx,ly;
+  if(zone==='forest'){ lx=z.w-180; ly=180; }          // hang sâu góc xa cổng vào
+  else if(zone==='cave'){ lx=180; ly=z.h-180; }
+  else { lx=z.w/2; ly=140; }                            // dungeon & khác
+  enemies[id]={x:lx,y:ly,zone,hp:1800*tier,maxhp:1800*tier,spd:40,atk:0,dead:false,respawnT:0,xp:600*tier,gold:200*tier,r:34,boss:true,dmg:30*tier,lairX:lx,lairY:ly,leash:380};
 }
 for(let i=0;i<4;i++) spawnEnemy('forest');
 for(let i=0;i<5;i++) spawnEnemy('cave');
 for(let i=0;i<6;i++) spawnEnemy('dungeon');
 spawnBoss('dungeon'); // Mật Thất: boss luôn chờ sẵn, vé vào mới là cửa ải (kiểu Blood Castle)
 
-// ---- BOSS THẾ GIỚI THEO LỊCH CỐ ĐỊNH, ĐẾM NGƯỢC CÔNG KHAI (kiểu MU Crywolf/Invasion) ----
-// Số giây đặt tạm để test nhanh — khi hài lòng cơ chế, chỉnh lại cho gần thực tế (VD 1800-3600s).
-const BOSS_CFG = { forest:{interval:180, active:90}, cave:{interval:240, active:90} };
+// ---- BOSS THẾ GIỚI: xuất hiện tại HANG SÂU của map, giữ hang (không lòng vòng), timer dài ----
+const BOSS_CFG = { forest:{interval:900, active:900}, cave:{interval:1200, active:900} };
 const zoneBoss = { forest:{phase:'countdown', t:BOSS_CFG.forest.interval}, cave:{phase:'countdown', t:BOSS_CFG.cave.interval} };
 function despawnZoneBoss(zone){
   for(const eid in enemies){ const e=enemies[eid]; if(e.zone===zone&&e.boss&&!e.dead){ delete enemies[eid]; break; } }
@@ -4348,6 +4351,13 @@ setInterval(()=>{
     for(const id in players){const p=players[id];if(!p.chosen||p.dead||p.zone!==e.zone)continue;const d=Math.hypot(p.x-e.x,p.y-e.y);if(d<best){best=d;tp=p;tpIll=false;}}
     for(let ii=0;ii<illusions.length;ii++){const il=illusions[ii]; if(il.zone!==e.zone)continue; const d=Math.hypot(il.x-e.x,il.y-e.y)*0.6; if(d<best){best=d;tp=il;tpIll=true;}}
     const espd=e.spd*((e.slowT>0)?(e.slowMul||1):1);
+    if(e.boss && e.lairX!==undefined){
+      const lx=e.lairX, ly=e.lairY, lr=e.leash||380; let engage=false;
+      if(tp){ const tpLair=Math.hypot(tp.x-lx,tp.y-ly), tpDist=Math.hypot(tp.x-e.x,tp.y-e.y); if(tpLair<=lr||tpDist<=lr) engage=true; }
+      if(!engage){ const dl=Math.hypot(e.x-lx,e.y-ly);
+        if(dl>10){ const a=Math.atan2(ly-e.y,lx-e.x); e.x+=Math.cos(a)*espd*dt; e.y+=Math.sin(a)*espd*dt; clampEnemyPos(e); }
+        tp=null; }
+    }
     if(tp){ const reach=15+e.r; if(best>reach){const a=Math.atan2(tp.y-e.y,tp.x-e.x);e.x+=Math.cos(a)*espd*dt;e.y+=Math.sin(a)*espd*dt;}
       else if(e.atk<=0){ const a=Math.atan2(tp.y-e.y,tp.x-e.x); e.x+=Math.cos(a)*12;e.y+=Math.sin(a)*12;
         if(tpIll){ fxEv('bite',tp.x,tp.y,280,Math.cos(a),Math.sin(a),0); }
@@ -4471,4 +4481,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v3.08 (PAPERDOLL self: base + giáp/nón theo trang bị) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v3.09 (BOSS: giữ hang sâu + timer dài + mạnh hơn) chạy ở cổng '+PORT));
