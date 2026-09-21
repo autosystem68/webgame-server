@@ -637,7 +637,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="ic"></span><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v3.03 · MAP — ground layer, path, decor dày theo vùng</div>
+  <div id="ver">v3.04 · MAP — phá caro nền, path rõ, đốm/đèn đẹp hơn</div>
 </div>
 <script>
 var WW=560, WH=420;
@@ -713,7 +713,7 @@ var RUBBLE_GRID=['o.o.o.o','.ooooo.','oo.o.oo'];
 var BUSH_GRID=['.ggg.','ggggg','ggGgg','.g.g.'];
 var STUMP_GRID=['.ttt.','tTTTt','tTtTt','tTTTt'];
 var MUSH_GRID=['.mm..','mmmm.','.ss..','.ss..','..mm.','.mmmm','..ss.'];
-var LAMP_GRID=['.f.','fff','.p.','.p.','.p.','ppp'];
+var LAMP_GRID=['.fff.','fFFFf','.fff.','..p..','..p..','.ppp.'];
 var FENCE_GRID=['w.w.w.w','wwwwwww','w.w.w.w'];
 var FOUNT_GRID=['.sssss.','soooooS','sooOoos','sooooos','SoooooS','.sssss.'];
 var SIGN_GRID=['ppppp','ppppp','..w..','..w..'];
@@ -735,7 +735,7 @@ var DECOR_TYPES={
   stump:{grid:STUMP_GRID,col:{'t':'#3a2818','T':'#5a4028'}},
   mushroom:{grid:MUSH_GRID,col:{'m':'#a83828','s':'#e8dcc0'}},
   mushroomB:{grid:MUSH_GRID,col:{'m':'#6a3a8a','s':'#d8c8e8'}},
-  lamp:{grid:LAMP_GRID,col:{'f':'#ffcf6b','p':'#3a2a1a'}},
+  lamp:{grid:LAMP_GRID,col:{'f':'#ffcf6b','F':'#fff0b0','p':'#3a2a1a'}},
   fence:{grid:FENCE_GRID,col:{'w':'#6a4a2a'}},
   fountain:{grid:FOUNT_GRID,col:{'s':'#6a6a72','S':'#82828c','o':'#2a6a8a','O':'#4a9ac0'}},
   sign:{grid:SIGN_GRID,col:{'p':'#7a5a2a','w':'#4a3418'}}
@@ -776,13 +776,17 @@ var ZONE_DECOR={
 // ===== GROUND LAYER (procedural, phủ kín + biến sắc + path + rải decor nhỏ, cull theo camera) =====
 function h2(x,y){ var n=(x*374761393+y*668265263)|0; n=(n^(n>>>13))*1274126177|0; n^=n>>>16; return (n>>>0)/4294967296; }
 var GROUND={
-  town:   {base:'#141d10',tiles:['#243a1c','#2a4420','#20351a','#284020'],ts:46,path:'#6a5636',pathW:36,ss:24,density:0.32,
+  town:   {base:'#141d10',tiles:['#243a1c','#2a4420','#20351a','#284020','#26401c'],ts:46,path:'#6a5636',pathEdge:'#463618',pathW:34,ss:26,density:0.30,
+    patchD:'#1a2e14',patchL:'#31522a',
     specks:[{k:'blade',c:'#356426'},{k:'blade',c:'#437a2e'},{k:'dot',c:'#e8d05a'},{k:'dot',c:'#d86a8a'},{k:'dot',c:'#e0e0e0'}]},
-  forest: {base:'#0c0806',tiles:['#152810','#1a3014','#12240e','#182c12'],ts:46,path:'#4a3a24',pathW:32,ss:21,density:0.46,
+  forest: {base:'#0c0806',tiles:['#152810','#1a3014','#12240e','#182c12','#16290f'],ts:46,path:'#4a3a24',pathEdge:'#2e2416',pathW:32,ss:22,density:0.42,
+    patchD:'#0e1e0a',patchL:'#22401a',
     specks:[{k:'blade',c:'#274c1c'},{k:'blade',c:'#1e3c16'},{k:'clump',c:'#12200c'},{k:'dot',c:'#3a5a24'},{k:'dot',c:'#c8a83a'}]},
-  cave:   {base:'#070c14',tiles:['#16283a','#1b3145','#122234','#193049'],ts:46,path:'#3d4d5e',pathW:32,ss:24,density:0.34,
-    specks:[{k:'cross',c:'#8ac0e0'},{k:'dot',c:'#cfeaf7'},{k:'pebble',c:'#2a3f52'},{k:'cross',c:'#6aa0c0'},{k:'pebble',c:'#34506a'}]},
-  dungeon:{base:'#0d070d',tiles:['#241826','#2b1e2d','#1e1420','#281a2a'],ts:46,path:'#4a3a4a',pathW:32,ss:26,density:0.32,
+  cave:   {base:'#070c14',tiles:['#16283a','#1b3145','#122234','#193049','#17293c'],ts:46,path:'#3d4d5e',pathEdge:'#233241',pathW:32,ss:32,density:0.22,
+    patchD:'#0e1c2c',patchL:'#25415a',
+    specks:[{k:'cross',c:'#8ac0e0'},{k:'dot',c:'#cfeaf7'},{k:'pebble',c:'#2a3f52'},{k:'pebble',c:'#34506a'},{k:'dot',c:'#5a7f9a'}]},
+  dungeon:{base:'#0d070d',tiles:['#241826','#2b1e2d','#1e1420','#281a2a','#241826'],ts:46,path:'#4a3a4a',pathEdge:'#2c1f30',pathW:32,ss:28,density:0.28,
+    patchD:'#160e18',patchL:'#342238',
     specks:[{k:'dash',c:'#120d14'},{k:'pebble',c:'#3a2c3c'},{k:'dot',c:'#c9b896'},{k:'dash',c:'#3a2838'},{k:'pebble',c:'#241a28'}]}
 };
 // path = các đoạn nối portal ↔ trung tâm ↔ NPC để người chơi cảm được hướng đi
@@ -798,27 +802,52 @@ function drawGround(zd,zone,camX,camY){
   var vy0=Math.max(0,camY-WH/2-30), vy1=Math.min(zd.h,camY+WH/2+30);
   var TS=G.ts, nt=G.tiles.length;
   var tx0=Math.floor(vx0/TS), tx1=Math.ceil(vx1/TS), ty0=Math.floor(vy0/TS), ty1=Math.ceil(vy1/TS);
+  // base tiles + dither viền để phá lưới caro
   for(var ty=ty0;ty<ty1;ty++){ for(var tx=tx0;tx<tx1;tx++){
+    var bx=tx*TS, by=ty*TS;
     ctx.fillStyle=G.tiles[Math.floor(h2(tx,ty)*nt)%nt];
-    ctx.fillRect(tx*TS,ty*TS,TS+1,TS+1);
+    ctx.fillRect(bx,by,TS+1,TS+1);
+    // vài mảnh sắc lân cận rải ở mép → xoá cảm giác ô vuông
+    if(h2(tx*3+1,ty*3+2)<0.7){
+      ctx.fillStyle=G.tiles[Math.floor(h2(tx+9,ty+4)*nt)%nt];
+      var fs=TS*(0.28+h2(tx,ty)*0.22);
+      ctx.fillRect(bx+h2(tx,ty+7)*TS*0.72, by+h2(tx+7,ty)*TS*0.72, fs, fs);
+      ctx.fillRect(bx+TS-fs*0.8-h2(tx+2,ty)*TS*0.3, by+TS-fs*0.8-h2(tx,ty+3)*TS*0.3, fs*0.7, fs*0.7);
+    }
   }}
+  // mảng loang lớn (biến sắc quy mô lớn, alpha thấp) — phá đều
+  var CS=TS*3;
+  var cx0=Math.floor(vx0/CS), cx1=Math.ceil(vx1/CS), cy0=Math.floor(vy0/CS), cy1=Math.ceil(vy1/CS);
+  ctx.globalAlpha=0.15;
+  for(var cy=cy0;cy<cy1;cy++){ for(var cx=cx0;cx<cx1;cx++){
+    var pr=h2(cx*5+2,cy*5+9); if(pr>0.52) continue;
+    ctx.fillStyle=pr<0.26?G.patchD:G.patchL;
+    ctx.fillRect(cx*CS-8,cy*CS-8,CS+16,CS+16);
+  }}
+  ctx.globalAlpha=1;
+  // path: viền tối + lõi đất đặc → ra con đường thật
   var segs=ZPATHS[zone];
-  if(segs){ ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=0.5;ctx.strokeStyle=G.path;ctx.lineWidth=G.pathW;
+  if(segs){ ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.globalAlpha=0.6;ctx.strokeStyle=G.pathEdge;ctx.lineWidth=G.pathW+9;
     for(var s=0;s<segs.length;s++){var sg=segs[s];ctx.beginPath();ctx.moveTo(sg[0],sg[1]);ctx.lineTo(sg[2],sg[3]);ctx.stroke();}
+    ctx.globalAlpha=0.92;ctx.strokeStyle=G.path;ctx.lineWidth=G.pathW;
+    for(var s2=0;s2<segs.length;s2++){var s3=segs[s2];ctx.beginPath();ctx.moveTo(s3[0],s3[1]);ctx.lineTo(s3[2],s3[3]);ctx.stroke();}
     ctx.globalAlpha=1; }
+  // đốm nhỏ (rải lệch + biến kích cỡ, không bám lưới)
   var SS=G.ss, ns=G.specks.length;
   var gx0=Math.floor(vx0/SS), gx1=Math.ceil(vx1/SS), gy0=Math.floor(vy0/SS), gy1=Math.ceil(vy1/SS);
   for(var gy=gy0;gy<gy1;gy++){ for(var gx=gx0;gx<gx1;gx++){
     var r=h2(gx*7+3,gy*7+11); if(r>=G.density) continue;
     var sp=G.specks[Math.floor(h2(gx*13,gy*17)*ns)%ns];
-    var ox=gx*SS+h2(gx,gy+5)*SS*0.7, oy=gy*SS+h2(gx+5,gy)*SS*0.7;
+    var ox=gx*SS+h2(gx,gy+5)*SS*0.8, oy=gy*SS+h2(gx+5,gy)*SS*0.8;
+    var sc=0.7+h2(gx+2,gy+8)*0.7;
     ctx.fillStyle=sp.c;
-    if(sp.k==='blade'){ ctx.fillRect(ox,oy-4,1.4,5);ctx.fillRect(ox+2,oy-3,1.4,4);ctx.fillRect(ox-2,oy-2,1.4,3); }
-    else if(sp.k==='dot'){ ctx.fillRect(ox,oy,2.4,2.4); }
-    else if(sp.k==='pebble'){ ctx.fillRect(ox,oy,3.4,2.2); }
-    else if(sp.k==='cross'){ ctx.fillRect(ox-1.5,oy,4.5,1.4);ctx.fillRect(ox+0.3,oy-1.5,1.4,4.5); }
-    else if(sp.k==='dash'){ ctx.save();ctx.translate(ox,oy);ctx.rotate(r*3.1);ctx.fillRect(0,0,6,1.4);ctx.restore(); }
-    else if(sp.k==='clump'){ ctx.fillRect(ox,oy,4,3);ctx.fillRect(ox+1,oy-2,2,2); }
+    if(sp.k==='blade'){ ctx.fillRect(ox,oy-4*sc,1.4,5*sc);ctx.fillRect(ox+2,oy-3*sc,1.4,4*sc);ctx.fillRect(ox-2,oy-2*sc,1.4,3*sc); }
+    else if(sp.k==='dot'){ var d=2.4*sc; ctx.fillRect(ox,oy,d,d); }
+    else if(sp.k==='pebble'){ ctx.fillRect(ox,oy,3.4*sc,2.2*sc); }
+    else if(sp.k==='cross'){ var cl=(3.4)*sc; ctx.fillRect(ox-cl*0.4,oy,cl,1.3);ctx.fillRect(ox+cl*0.1,oy-cl*0.4,1.3,cl); }
+    else if(sp.k==='dash'){ ctx.save();ctx.translate(ox,oy);ctx.rotate(r*3.1);ctx.fillRect(0,0,6*sc,1.4);ctx.restore(); }
+    else if(sp.k==='clump'){ ctx.fillRect(ox,oy,4*sc,3*sc);ctx.fillRect(ox+1,oy-2*sc,2*sc,2*sc); }
   }}
 }
 function resize(){
@@ -4401,4 +4430,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v3.03 (MAP: ground layer + path + decor theo vùng) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v3.04 (MAP: phá caro nền + path rõ + polish decor) chạy ở cổng '+PORT));
