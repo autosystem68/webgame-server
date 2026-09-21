@@ -637,7 +637,7 @@ const CLIENT = `<!doctype html>
     <div class="sk" id="sR"><span class="ic"></span><span class="k">R</span><span class="l">CUỒNG</span><span class="m">55</span><div class="cd"></div></div>
   </div>
   <div id="st">Đang kết nối...</div>
-  <div id="ver">v3.05 · BOSS — sprite rồng thật (OGA) cho World Boss</div>
+  <div id="ver">v3.06 · BOSS — ogre/golem/quỷ cho boss map đầu; rồng để dành boss cao cấp</div>
 </div>
 <script>
 var WW=560, WH=420;
@@ -656,6 +656,11 @@ DRAGON_SHEET.src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAawAAAF5CAYAAADD
 var BOSS_DRAGON={forest:[112,110,172,103],cave:[319,70,80,66]};
 function drawBossSprite(zone,cx,cy,hgt){ var d=BOSS_DRAGON[zone]||BOSS_DRAGON.forest; var dh=hgt, dw=dh*(d[2]/d[3]);
   ctx.imageSmoothingEnabled=false; ctx.drawImage(DRAGON_SHEET,d[0],d[1],d[2],d[3],Math.round(cx-dw/2),Math.round(cy-dh/2),dw,dh); }
+var BOSS_SHEET=new Image(); var bossMonReady=false; BOSS_SHEET.onload=function(){bossMonReady=true;};
+BOSS_SHEET.src='data:image/png;base64,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';
+var BOSS_MON={forest:[2,1,24,29],cave:[32,1,26,29],dungeon:[62,1,20,30]};
+function drawBossMon(zone,cx,cy,hgt){ var d=BOSS_MON[zone]; if(!d) return; var dh=hgt, dw=dh*(d[2]/d[3]);
+  ctx.imageSmoothingEnabled=false; ctx.drawImage(BOSS_SHEET,d[0],d[1],d[2],d[3],Math.round(cx-dw/2),Math.round(cy-dh/2),dw,dh); }
 var CHAR_GRID=['....ooo......','...ohhho.....','..ohhhhho....','.ohhhhhhho...','.ohsesseho...','..osssso.....',
   '...ooo.......','..obBBBbo....','.oaBBBBBao...','.oaBBBBBao...','.oaBBBBBao...','..obBBBbo....','...obbbo.....','..oll..llo...','..oll..llo...',
   '..llll.llll..','..llll.llll..'];
@@ -2098,7 +2103,8 @@ function frame(now){
     var msh=en.boss?null:en.mshape;
     if(en.boss){
       var bossPulse=(Math.sin(performance.now()/300)+1)/2;
-      if(dragonReady && BOSS_DRAGON[en.zone]){ drawBossSprite(en.zone,en.x,en.y-er*0.4,er*3.0); }
+      if(bossMonReady && BOSS_MON[en.zone]){ drawBossMon(en.zone,en.x,en.y-er*0.3,er*2.8); }
+      else if(dragonReady && BOSS_DRAGON[en.zone]){ drawBossSprite(en.zone,en.x,en.y-er*0.4,er*3.0); }
       else { var bossCol={'o':'#7a1838'}; drawPixelGrid(BOSS_GRID,bossCol,en.x,en.y,er*0.31); }
       ctx.save();ctx.globalAlpha=0.4+bossPulse*0.25;ctx.strokeStyle='#ff4a7a';ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(en.x,en.y,er+6+bossPulse*4,0,7);ctx.stroke();ctx.restore();
@@ -4436,4 +4442,4 @@ function r1(v){return Math.round(v*10)/10;} function r2(v){return Math.round(v*1
 setInterval(()=>{ for(const id in players){ const p=players[id]; if(p.charUser&&p.charSlot&&p.chosen) dbSaveChar(p.charUser,p.charSlot,p); } }, 60000);
 
 dbInit();
-server.listen(PORT,()=>console.log('✅ WEBGAME v3.05 (BOSS: sprite rồng OGA cho world boss) chạy ở cổng '+PORT));
+server.listen(PORT,()=>console.log('✅ WEBGAME v3.06 (BOSS: ogre/golem/quỷ; dragon reserved high-tier) chạy ở cổng '+PORT));
